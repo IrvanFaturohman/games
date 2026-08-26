@@ -6,17 +6,20 @@
 import { boot } from '../shared/boot.js';
 import { SCENE_ORDER, mixScenes } from './style.js';
 import {
-  layout, drawBackground, drawPlatforms, drawStick, drawHero,
+  layout, setZoom, drawBackground, drawPlatforms, drawStick, drawHero,
   drawEffects, drawHud, drawPrompt,
 } from './scene.js';
 
 const NAME = 'stick-hero';
 
-const GROW_RATE    = 220;   // px/s — the whole feel of the game lives here
+// All lengths below are WORLD units. The camera draws them at ZOOM, so an
+// on-screen speed of ~205 px/s is 205 / 0.62 here. Tuning these by how they
+// look on screen without dividing by ZOOM is the easy mistake.
+const GROW_RATE    = 560;   // world px/s — the whole feel of the game lives here
 const FALL_TIME    = 0.32;  // stick swinging down
-const WALK_SPEED   = 175;
+const WALK_SPEED   = 480;
 const CAM_TIME     = 0.40;
-const PERFECT_MAX  = 7;     // half-width of the double-score zone, on a wide platform
+const PERFECT_MAX  = 18;    // half-width of the double-score zone, on a wide platform
 const RAMP_OVER    = 20;    // points from opening difficulty to full
 const SCENE_EVERY  = 5;
 const SCENE_FADE   = 0.9;
@@ -45,7 +48,10 @@ const rightEdge = (p) => p.x + p.w;
 // Hero stands 20px in from the right edge, but never past the middle — on a
 // narrow platform a fixed inset would place it off the left side entirely.
 const standX = (p) => rightEdge(p) - Math.min(20, p.w / 2);
-const maxReach = (stage) => stage.w - layout(stage).pivotX - 24;
+const maxReach = (stage) => {
+  const L = layout(stage);
+  return L.viewW - L.px - 30;
+};
 
 // Difficulty has to actually ramp — flat random geometry reads as easy forever
 // no matter how wide the spread is. Platforms narrow and gaps stretch together.
@@ -56,33 +62,33 @@ function addPlatform(stage) {
   const opening = S.platforms.length <= 3;   // first few near-impossible to fail
   const d = opening ? 0 : difficulty();
 
-  const w = rand(lerp(96, 16, d), lerp(122, 32, d));
-  const gapMin = opening ? 44 : lerp(52, 100, d);
+  const w = rand(lerp(230, 44, d), lerp(280, 72, d));
+  const gapMin = opening ? 150 : lerp(180, 300, d);
   // Never generate a gap the player cannot span before the stick runs off screen.
-  const gapMax = Math.max(gapMin + 12,
-    Math.min(opening ? 84 : lerp(98, 252, d), maxReach(stage) - w - 12));
+  const gapMax = Math.max(gapMin + 20,
+    Math.min(opening ? 300 : lerp(340, 700, d), maxReach(stage) - w - 40));
 
   S.platforms.push({
     x: rightEdge(last) + rand(gapMin, gapMax),
     w,
     // Scaled, not fixed: a 14px zone on a 30px platform would make perfects
     // routine exactly when they should be getting rare.
-    half: Math.min(PERFECT_MAX, w * 0.13),
+    half: Math.min(PERFECT_MAX, w * 0.16),
   });
 }
 
 function reset(stage) {
   const L = layout(stage);
   // Starts off-screen left so the first platform has no visible left edge.
-  S.platforms = [{ x: -220, w: 340, half: PERFECT_MAX }];
+  S.platforms = [{ x: -1000, w: 1400, half: PERFECT_MAX }];
   S.index = 0;
   S.score = 0;
   while (S.platforms.length < 4) addPlatform(stage);
 
   const p = platform(0);
-  S.cam = S.camFrom = S.camTo = rightEdge(p) - L.pivotX;
+  S.cam = S.camFrom = S.camTo = rightEdge(p) - L.px;
   S.camT = 1;
-  S.hero = { x: standX(p), y: L.groundY, walkPhase: null, squash: 0, crouch: 0, spin: 0 };
+  S.hero = { x: standX(p), y: L.gy, walkPhase: null, squash: 0, crouch: 0, spin: 0 };
   S.stick = { x: rightEdge(p), len: 0, angle: 0, wobble: 0 };
   S.flash = S.shake = S.punch = 0;
   S.puffs = []; S.rings = []; S.popup = null;
@@ -94,19 +100,21 @@ function reset(stage) {
 // Keep the run intact across an orientation or viewport-height change.
 function relayout(stage) {
   const L = layout(stage);
-  if (S.phase !== 'dropping' && S.phase !== 'dead') S.hero.y = L.groundY;
-  S.camTo = rightEdge(platform(S.index)) - L.pivotX;
+  if (S.phase !== 'dropping' && S.phase !== 'dead') S.hero.y = L.gy;
+  S.camTo = rightEdge(platform(S.index)) - L.px;
   if (S.phase !== 'scroll') { S.cam = S.camTo; S.camFrom = S.camTo; S.camT = 1; }
 }
 
 const targetScene = () =>
   SCENE_ORDER[Math.floor(S.score / SCENE_EVERY) % SCENE_ORDER.length];
 
-function puff(x, y, n, dark = false) {
+// Positions and velocities are world units; `r` is screen px, because that is
+// how drawEffects reads it.
+function puff(x, y, n, k, dark = false) {
   for (let i = 0; i < n; i++) {
     S.puffs.push({
-      x, y, vx: rand(-75, 75), vy: rand(-140, -35),
-      r: rand(2.5, 5.5), t: 0, max: rand(0.35, 0.62), dark,
+      x, y, vx: rand(-110, 110) * k, vy: rand(-210, -55) * k,
+      r: rand(2.5, 5.5), t: 0, max: rand(0.35, 0.62), dark, g: k,
     });
   }
 }
@@ -149,7 +157,7 @@ function stepEffects(dt) {
 
   for (let i = S.puffs.length - 1; i >= 0; i--) {
     const e = S.puffs[i];
-    e.t += dt; e.x += e.vx * dt; e.y += e.vy * dt; e.vy += 300 * dt;
+    e.t += dt; e.x += e.vx * dt; e.y += e.vy * dt; e.vy += 450 * e.g * dt;
     if (e.t >= e.max) S.puffs.splice(i, 1);
   }
   for (let i = S.rings.length - 1; i >= 0; i--) {
@@ -174,9 +182,9 @@ function update(dt, game) {
       S.stick.len += GROW_RATE * dt;
       // Sways more the longer it gets — sells the weight and warns you that
       // holding longer is not free.
-      S.stick.wobble = Math.sin(S.time * 9) * Math.min(1, S.stick.len / 180) * 0.022;
-      S.hero.crouch = Math.min(1, S.stick.len / 200);
-      const cap = stage.h * 0.92;
+      S.stick.wobble = Math.sin(S.time * 9) * Math.min(1, S.stick.len / 280) * 0.022;
+      S.hero.crouch = Math.min(1, S.stick.len / 320);
+      const cap = L.bottom * 0.92;
       if (S.stick.len > cap) { S.stick.len = cap; release(game); }
       break;
     }
@@ -196,7 +204,7 @@ function update(dt, game) {
         S.phase = 'walking';
         S.hero.walkPhase = 0;
         S.shake = Math.max(S.shake, 0.35);
-        puff(tip, L.groundY, 5, true);
+        puff(tip, L.gy, 5, 1 / L.zoom, true);
         game.audio.play('place');
         buzz(8);
       }
@@ -218,9 +226,9 @@ function update(dt, game) {
           const next = platform(S.index + 1);
           if (S.pendingPerfect) {
             S.flash = 1;
-            S.rings.push({ x: next.x + next.w / 2, y: L.groundY, t: 0, max: 0.5 });
-            puff(next.x + next.w / 2, L.groundY, 10);
-            S.popup = { text: '+2', x: S.hero.x, y: L.groundY - 76, t: 0, max: 0.7 };
+            S.rings.push({ x: next.x + next.w / 2, y: L.gy, t: 0, max: 0.5 });
+            puff(next.x + next.w / 2, L.gy, 10, 1 / L.zoom);
+            S.popup = { text: '+2', x: S.hero.x, y: L.gy - 170, t: 0, max: 0.7 };
             game.audio.play('perfect');
             buzz(30);
           } else {
@@ -232,14 +240,14 @@ function update(dt, game) {
           S.index++;
           addPlatform(stage);
           S.camFrom = S.cam;
-          S.camTo = rightEdge(platform(S.index)) - L.pivotX;
+          S.camTo = rightEdge(platform(S.index)) - L.px;
           S.camT = 0;
           S.phase = 'scroll';
         } else {
           S.phase = 'dropping';
           S.dropV = 0;
           S.shake = 1;
-          puff(S.hero.x, L.groundY, 8, true);
+          puff(S.hero.x, L.gy, 8, 1 / L.zoom, true);
           game.audio.play('fail');
           buzz([30, 50, 30]);
         }
@@ -262,7 +270,7 @@ function update(dt, game) {
       S.hero.y += S.dropV * dt;
       S.hero.spin += dt * 5.5;
       S.stick.angle = Math.min(Math.PI, S.stick.angle + dt * 5);
-      if (S.hero.y > stage.h + 140) {
+      if (S.hero.y > L.bottom + 200) {
         S.best = game.store.bestScore(S.score);
         S.phase = 'dead';
       }
@@ -281,10 +289,17 @@ function render(ctx, game) {
     ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
   }
   drawBackground(ctx, stage, S.cam, pal);
-  drawPlatforms(ctx, stage, S.cam, pal, S.platforms, S.index, S.time);
-  drawStick(ctx, stage, S.cam, pal, S.stick);
-  drawHero(ctx, stage, S.cam, pal, S.hero);
-  drawEffects(ctx, stage, S.cam, pal, S);
+
+  // Background stays in screen space; everything the player touches is drawn in
+  // world units and shrunk by the camera.
+  const L = layout(stage);
+  ctx.save();
+  ctx.scale(L.zoom, L.zoom);
+  drawPlatforms(ctx, L, S.cam, pal, S.platforms, S.index, S.time);
+  drawStick(ctx, L, S.cam, pal, S.stick);
+  drawHero(ctx, L, S.cam, pal, S.hero);
+  drawEffects(ctx, L, S.cam, pal, S);
+  ctx.restore();
   ctx.restore();
 
   drawHud(ctx, stage, pal, {
@@ -304,6 +319,7 @@ boot({ name: NAME, ready, input, update, render }).then((game) => {
       paint: () => render(game.stage.ctx, game),
       reset: () => reset(game.stage),
       difficulty,
+      setZoom: (z) => { setZoom(z); relayout(game.stage); },
     };
   }
 });

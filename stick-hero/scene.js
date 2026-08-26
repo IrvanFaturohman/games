@@ -3,6 +3,8 @@
 
 import { OPACITY, PARALLAX, TYPE } from './style.js';
 
+const HERO_SCALE = 1.85;
+
 const rgba = (hex, a) => {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
@@ -11,10 +13,24 @@ const rgba = (hex, a) => {
 // Derived from stage size every frame, never cached at startup — the iOS URL
 // bar changes height mid-session and stage.onResize does not fire for the
 // initial size anyway.
+// How much world fits on screen. Below 1 the camera pulls back: the play layer
+// shrinks and the visible world widens by 1/ZOOM, which is what lets gaps get
+// long enough to feel like a leap instead of a step.
+let ZOOM = 0.32;
+export const getZoom = () => ZOOM;
+// Exposed so the camera can be dialled while the game runs — see __debug.
+export const setZoom = (z) => { ZOOM = z; };
+
 export function layout(stage) {
+  const groundY = Math.round(stage.h * 0.76);
+  const pivotX = Math.round(stage.w * 0.32);   // where the current platform's edge sits
   return {
-    groundY: Math.round(stage.h * 0.76),
-    pivotX: Math.round(stage.w * 0.32),   // where the current platform's edge sits
+    zoom: ZOOM,
+    groundY, pivotX,           // screen px — background and HUD live here
+    gy: groundY / ZOOM,        // the same ground line, in world units
+    px: pivotX / ZOOM,
+    bottom: stage.h / ZOOM,
+    viewW: stage.w / ZOOM,     // how wide the world slice on screen actually is
   };
 }
 
@@ -61,45 +77,46 @@ export function drawBackground(ctx, stage, cam, pal) {
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
 
+  // cam is in world units, the bands are drawn in screen units — scale the
+  // offset or the background slides faster than the world it sits behind.
   const g = layout(stage).groundY;
+  const c = cam * ZOOM;
   band(ctx, w, h, { baseY: g - h * 0.20, amp: h * 0.10, wave: 520,
-    offset: -cam * PARALLAX.bandFar, color: pal.veil, alpha: OPACITY.bandFar });
+    offset: -c * PARALLAX.bandFar, color: pal.veil, alpha: OPACITY.bandFar });
   band(ctx, w, h, { baseY: g - h * 0.11, amp: h * 0.09, wave: 430,
-    offset: -cam * PARALLAX.bandMid - 140, color: pal.veil, alpha: OPACITY.bandMid });
+    offset: -c * PARALLAX.bandMid - 140, color: pal.veil, alpha: OPACITY.bandMid });
   band(ctx, w, h, { baseY: g - h * 0.03, amp: h * 0.075, wave: 350,
-    offset: -cam * PARALLAX.bandNear - 300, color: pal.veil, alpha: OPACITY.bandNear });
+    offset: -c * PARALLAX.bandNear - 300, color: pal.veil, alpha: OPACITY.bandNear });
 }
 
-export function drawPlatforms(ctx, stage, cam, pal, platforms, fromIndex, time) {
-  const { groundY } = layout(stage);
-  const body = ctx.createLinearGradient(0, groundY, 0, stage.h);
+export function drawPlatforms(ctx, L, cam, pal, platforms, fromIndex, time) {
+  const body = ctx.createLinearGradient(0, L.gy, 0, L.bottom);
   body.addColorStop(0, pal.ink);
   body.addColorStop(1, pal.inkDeep);
 
   platforms.forEach((p, i) => {
     const x = p.x - cam;
-    if (x + p.w < -8 || x > stage.w + 8) return;
+    if (x + p.w < -12 || x > L.viewW + 12) return;
     ctx.fillStyle = body;
-    ctx.fillRect(x, groundY, p.w, stage.h - groundY);
+    ctx.fillRect(x, L.gy, p.w, L.bottom - L.gy);
 
     // Only ahead of the hero — a marker on the platform you are standing on is
     // just noise. It breathes so the eye lands on it under time pressure.
     if (i > fromIndex && p.half > 1.5) {
       const pulse = 0.72 + 0.28 * Math.sin(time * 4 + i);
       ctx.fillStyle = rgba(pal.glow, pulse);
-      ctx.fillRect(x + p.w / 2 - p.half, groundY, p.half * 2, 5);
+      ctx.fillRect(x + p.w / 2 - p.half, L.gy, p.half * 2, 18);
     }
   });
 }
 
-export function drawStick(ctx, stage, cam, pal, stick) {
+export function drawStick(ctx, L, cam, pal, stick) {
   if (!stick || stick.len <= 0) return;
-  const { groundY } = layout(stage);
   ctx.save();
-  ctx.translate(stick.x - cam, groundY);
+  ctx.translate(stick.x - cam, L.gy);
   ctx.rotate(stick.angle + (stick.wobble || 0));
   ctx.fillStyle = pal.ink;
-  ctx.fillRect(-3.5, -stick.len, 7, stick.len);
+  ctx.fillRect(-8, -stick.len, 16, stick.len);
   ctx.restore();
 }
 
@@ -114,10 +131,13 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.fill();
 }
 
-export function drawHero(ctx, stage, cam, pal, hero) {
+export function drawHero(ctx, L, cam, pal, hero) {
   ctx.save();
   ctx.translate(hero.x - cam, hero.y);
   if (hero.spin) ctx.rotate(hero.spin);
+  // Drawn oversized in world units so that after the zoom it still reads on a
+  // phone — a 1:1 hero at ZOOM 0.62 loses its face.
+  ctx.scale(HERO_SCALE, HERO_SCALE);
 
   // Squash keeps volume: what it loses in height it gains in width, pivoting on
   // the feet so the hero never appears to sink into the platform.
@@ -153,41 +173,48 @@ export function drawHero(ctx, stage, cam, pal, hero) {
   ctx.restore();
 }
 
-export function drawEffects(ctx, stage, cam, pal, fx) {
+// Positions come from the world, sizes are authored in screen pixels. Without
+// the counter-scale a 3px ring stroke would render at 1px once the camera pulls
+// back, and the +2 popup would be unreadable.
+export function drawEffects(ctx, L, cam, pal, fx) {
+  const z = L.zoom;
+  const sx = (wx) => (wx - cam) * z;
+  const sy = (wy) => wy * z;
+
+  ctx.save();
+  ctx.scale(1 / z, 1 / z);
+
   for (const r of fx.rings) {
     const t = r.t / r.max;
-    ctx.save();
     ctx.globalAlpha = (1 - t) * 0.8;
     ctx.strokeStyle = pal.glow;
     ctx.lineWidth = 3 * (1 - t) + 1;
     ctx.beginPath();
-    ctx.arc(r.x - cam, r.y, 6 + t * 46, 0, Math.PI * 2);
+    ctx.arc(sx(r.x), sy(r.y), 6 + t * 46, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.restore();
   }
 
   for (const p of fx.puffs) {
     const t = p.t / p.max;
-    ctx.save();
     ctx.globalAlpha = (1 - t) * 0.75;
     ctx.fillStyle = p.dark ? pal.ink : pal.glow;
     ctx.beginPath();
-    ctx.arc(p.x - cam, p.y, p.r * (1 - t * 0.5), 0, Math.PI * 2);
+    ctx.arc(sx(p.x), sy(p.y), p.r * (1 - t * 0.5), 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
   }
 
   if (fx.popup) {
     const t = fx.popup.t / fx.popup.max;
-    ctx.save();
     ctx.globalAlpha = 1 - t * t;
     ctx.fillStyle = pal.glow;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = `${TYPE.title.weight} ${TYPE.title.size}px ${TYPE.family}`;
-    ctx.fillText(fx.popup.text, fx.popup.x - cam, fx.popup.y - t * 46);
-    ctx.restore();
+    ctx.fillText(fx.popup.text, sx(fx.popup.x), sy(fx.popup.y) - t * 46);
   }
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 export function drawHud(ctx, stage, pal, { score, best, flash, punch }) {

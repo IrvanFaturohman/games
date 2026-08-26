@@ -105,9 +105,9 @@ the hero walks off the end and falls. Score = platforms crossed.
   brief scale punch). This single reward is what makes people replay.
 - **Difficulty must ramp, not just vary.** Flat random geometry reads as easy
   forever however wide the spread — that was the first version's mistake.
-  `difficulty()` runs 0 → 1 over `RAMP_OVER` points; platforms narrow (~96 → ~16
-  px) and gaps stretch (~50 → ~250 px) together. Gaps are still clamped against
-  `maxReach()` so an unreachable one cannot be generated.
+  `difficulty()` runs 0 → 1 over `RAMP_OVER` points; platforms narrow (~79 → ~15
+  px on screen) and gaps stretch (~66 → ~220 px) together. Gaps are still
+  clamped against `maxReach()` so an unreachable one cannot be generated.
 - **`standX()` is clamped to the platform midpoint.** A fixed inset from the
   right edge puts the hero off the left side entirely once platforms get
   narrower than twice that inset — which they now do.
@@ -129,6 +129,29 @@ as it falls · `navigator.vibrate` on land / perfect / death, guarded.
 Squash pivots on the feet and trades height for width, so the hero never appears
 to sink into the platform. The flash is capped at `0.28` alpha — anything more
 reads as a whiteout rather than a hit.
+
+## Units: world vs screen
+
+`ZOOM` in `scene.js` is the camera. Below 1 it pulls back, so the visible world
+is `stage.w / ZOOM` wide — that is what gives gaps room to read as leaps rather
+than steps.
+
+| What | Units |
+|---|---|
+| platforms, gaps, stick, hero, camera, `GROW_RATE`, `WALK_SPEED` | **world** — drawn inside `ctx.scale(ZOOM, ZOOM)` |
+| sky, bands, glow, HUD, prompts | **screen** px |
+| effects (puffs, rings, `+2`) | positioned in world, **sized in screen px** — `drawEffects` counter-scales, or a 3px ring stroke would render at 1px |
+
+`layout()` returns both: `groundY`/`pivotX` in screen px for the background, and
+`gy`/`px`/`bottom`/`viewW` in world units for everything else.
+
+**The trap that cost two rounds here:** pulling the camera back and scaling the
+world geometry up by the same factor cancels out exactly, and the screen looks
+untouched. If you zoom out, let things get smaller — that *is* the effect. Tune
+by the on-screen numbers (world × ZOOM), and remember `GROW_RATE` is world units
+per second, so an on-screen 180 px/s is `180 / ZOOM` here.
+
+`__debug.setZoom(z)` dials it live without a reload.
 
 ## Art direction
 
