@@ -16,9 +16,11 @@ games/
   test/           device diagnostic page
 ```
 
-Each game is worked on in **its own Claude Code session** (`cd games/<game>`),
-driven by its own remote control. Only touch your own game's folder; `shared/`
-changes affect all three, so raise them with the user first.
+Each game is worked on in **its own Claude Code session**, from its own clone
+(see "One clone per session" below — the clone root *is* this repo root, there is
+no `games/` directory inside it), driven by its own remote control. Only touch
+your own game's folder; `shared/` changes affect all three, so raise them with
+the user first.
 
 ## Constraints that drive everything
 
@@ -81,8 +83,13 @@ page stuck on TAP UNTUK MULAI that ignores taps; the only evidence is a console
 error. `loadAll()` rejects on any missing asset, so one wrong path does exactly
 this.
 
-**A pointer that held fires both `onHoldEnd` and `onUp`**, in that order, and
-never `onTap`. `p.duration` exists only from `onUp` onward.
+**A held pointer can still fire `onTap`.** On release the order is `onHoldEnd`
+(when `p.held`), then `onUp`, then `onTap` — and the `onTap` guard is only
+`!p.moved && dur <= TAP_MAX_MS`. With `HOLD_MS` 220 and `TAP_MAX_MS` 350, a still
+thumb released inside that 130 ms window fires `onHoldEnd` *and* `onTap`, so a
+game wiring both gets its action twice. `p.duration` is assigned just before
+`onHoldEnd`, so it reads fine there and in `onTap`, but is undefined during
+`onDown`, `onMove` and `onHoldStart`.
 
 ## Assets
 
