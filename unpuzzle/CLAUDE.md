@@ -174,15 +174,55 @@ level-complete art, and UI marks. Load any of it through `loadAll()` from
   The user's own board. Pull the visual direction from here before inventing
   one; it is the tiebreaker whenever "flat minimal + bold color" leaves room.
 
+## Visual style: chunky here, flat everywhere else
+
+Decided with the user after a pass over the reference board. Unpuzzle diverges
+from the suite's flat law **on geometry only**, and the divergence is deliberate
+— it is not drift, and it is not a licence to touch `shared/`.
+
+| | Comes from | Value |
+|---|---|---|
+| Colour | `shared/tokens.js` | `COLOR`, `ACCENT['unpuzzle']` — unchanged, no local palette |
+| Type | `shared/tokens.js` | `TYPE` (Baloo 2) — already the right family for this look |
+| Spacing | `shared/tokens.js` | `SPACE` — unchanged |
+| Piece geometry | **local to this game** | rounded, die-cut, shadowed — see below |
+
+`STYLE` from `shared/tokens.js` (`radius: 0`, `strokeWidth: 4`) still governs the
+suite and the other two games. **Unpuzzle's pieces ignore it.** Keep the local
+geometry in one place — a `style.js` in this folder — so the override is a single
+readable exception rather than magic numbers sprinkled through `render`.
+
+The look, from the board:
+
+- **Radius scales with the cell, not the screen.** Express it as a fraction of
+  cell size (~0.18) inside the cell→screen transform, so a piece reads the same
+  on a small phone and a tablet. A fixed px radius makes pieces look sharp on a
+  big board and mushy on a small one.
+- **Die-cut outline.** A `COLOR.white` stroke *outside* the fill, ~3–4 px, is what
+  makes a piece read as a peel-able sticker rather than a painted tile. This is
+  the single detail doing most of the work on the board — do it before the shadow.
+- **Offset silhouette, not `ctx.shadowBlur`.** Draw the piece shape again beneath
+  itself, offset a few px, in charcoal at low alpha. A real blurred shadow per
+  piece per frame is the kind of thing that quietly costs frames on a mid-range
+  phone, and at this scale the offset version is indistinguishable.
+- **Warm saturated ground.** The board leans orange/yellow-green under multicolour
+  pieces. `COLOR.bg` cream is close enough to start; if it needs more heat, raise
+  it with the user rather than inventing a local background colour.
+
+The suite deliberately looks less uniform after this. That was the trade accepted:
+no `shared/` change, so no coordination with the stick-hero and polygram sessions.
+
 ## Conventions
 
 - **Player-facing copy is Indonesian** (`TAP UNTUK MULAI`, the hub cards, the
   test page); `index.html` is `<html lang="id">`. Code, comments and commit
   messages stay English.
 - No raw hex or raw font strings in `game.js` — pull from `../shared/tokens.js`
-  (`COLOR`, `ACCENT['unpuzzle']`, `TYPE`, `SPACE`, `STYLE`). Figma binds the same
-  tokens; raw values are how the two drift apart. The stub's inline
+  (`COLOR`, `ACCENT['unpuzzle']`, `TYPE`, `SPACE`). Figma binds the same tokens;
+  raw values are how the two drift apart. The stub's inline
   `'800 30px "Baloo 2"…'` is scaffold shorthand, not the pattern to copy.
+  `STYLE` is the one token group this game does not follow — see "Visual style"
+  above.
 - `store` is namespaced and swallows private-browsing failures. There is no score
   here, so `store.bestScore()` is not the right call — persist level progress
   with `store.get/set`.
