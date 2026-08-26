@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F1EA">
+<title>Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    min-height:100dvh;background:#F4F1EA;color:#2B2B2B;
+    font-family:"Baloo 2",system-ui,-apple-system,sans-serif;
+    padding:calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 40px);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:520px;margin:0 auto}
+  h1{font-size:34px;font-weight:800;letter-spacing:-0.02em}
+  .sub{color:#5A5A5A;font-size:15px;font-weight:600;margin:6px 0 32px}
+  a.card{
+    display:flex;align-items:center;gap:16px;
+    padding:20px;margin-bottom:12px;text-decoration:none;color:inherit;
+    background:#fff;border:3px solid #2B2B2B;
+  }
+  a.card:active{transform:translate(2px,2px)}
+  .chip{width:44px;height:44px;flex:none}
+  .name{font-size:19px;font-weight:800}
+  .desc{font-size:13px;font-weight:600;color:#5A5A5A;margin-top:2px}
+  .status{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.08em;color:#5A5A5A}
+  .tools{margin-top:32px;padding-top:24px;border-top:2px solid #D9D4C7}
+  .tools a{color:#5A5A5A;font-size:13px;font-weight:700;letter-spacing:.06em;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Games</h1>
+  <p class="sub">Prototipe web · dites di HP · nanti diangkat ke Unity</p>
+
+  <a class="card" href="./stick-hero/">
+    <svg class="chip" viewBox="0 0 44 44"><rect width="44" height="44" fill="#FF5A5F"/><rect x="10" y="26" width="10" height="10" fill="#2B2B2B"/><rect x="18" y="8" width="4" height="20" fill="#2B2B2B"/></svg>
+    <div><div class="name">Stick Hero</div><div class="desc">Tahan, lepas, seberangi</div></div>
+    <span class="status">STUB</span>
+  </a>
+
+  <a class="card" href="./unpuzzle/">
+    <svg class="chip" viewBox="0 0 44 44"><rect width="44" height="44" fill="#3DDC97"/><rect x="8" y="8" width="13" height="13" fill="#2B2B2B"/><rect x="23" y="8" width="13" height="13" fill="#2B2B2B"/><rect x="8" y="23" width="13" height="13" fill="#2B2B2B"/></svg>
+    <div><div class="name">Unpuzzle</div><div class="desc">Keluarkan tiap kepingan</div></div>
+    <span class="status">STUB</span>
+  </a>
+
+  <a class="card" href="./polygram/">
+    <svg class="chip" viewBox="0 0 44 44"><rect width="44" height="44" fill="#FFB627"/><path d="M8 34 L22 10 L36 34 Z" fill="#2B2B2B"/></svg>
+    <div><div class="name">Polygram</div><div class="desc">Susun bentuk isi siluet</div></div>
+    <span class="status">STUB</span>
+  </a>
+
+  <div class="tools"><a href="./test/">→ DEVICE TEST</a></div>
+</div>
+</body>
+</html>

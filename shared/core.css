@@ -1,0 +1,64 @@
+/* Mobile-web game shell.
+   Everything here exists to stop a phone browser from treating the game
+   like a document: no scroll, no zoom, no rubber-band, no tap flash. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;          /* kills pull-to-refresh + bounce */
+  background: #F4F1EA;
+  font-family: "Baloo 2", system-ui, -apple-system, sans-serif;
+  -webkit-text-size-adjust: 100%;     /* Safari ignores our sizes otherwise */
+}
+
+body {
+  position: fixed;                    /* iOS still scrolls without this */
+  inset: 0;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;        /* no long-press "save image" menu */
+}
+
+/* The canvas fills the dynamic viewport — dvh follows the browser chrome
+   as it slides away, which 100vh does not. */
+#stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  display: block;
+  touch-action: none;
+}
+
+/* Anything overlaid on the canvas (HUD, buttons) sits inside the notch. */
+.safe {
+  position: absolute;
+  inset: 0;
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  pointer-events: none;
+}
+.safe > * { pointer-events: auto; }
+
+/* Shown until the first tap unlocks audio and the loop starts. */
+#tap-to-start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+  background: #F4F1EA;
+  color: #2B2B2B;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+#tap-to-start.hidden { display: none; }
