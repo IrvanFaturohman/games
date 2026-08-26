@@ -67,10 +67,23 @@ is no cutting into multi-cell pieces. **The tile face is the picture's colour** 
 the board is the animal, full colour — and the arrow on it stays neutral so it
 never competes with the drawing. Eyes are cells painted `ink`.
 
+Every tile's face is nudged a few percent lighter or darker by its own
+coordinates (`tone()` in style.js, applied once at load). A large field of one
+flat colour reads as a slab; the nudge turns it into a surface while still
+obviously being one colour.
+
 Both the tile's thickness and its arrow are derived from its own face colour, so
 adding a colour to the palette needs nothing else: the thickness is a 0.74 shade
 of the face, and the arrow is white unless the face is paler than 0.80 luminance,
-in which case it becomes a deep tint of the face. That threshold sits high on
+in which case it becomes a deep tint of the face.
+
+**`shade()` returns hex, not `rgb()`** — its output is fed straight back into
+`shade()` and `arrowInk()`, both of which parse hex. Returning `rgb()` produces
+NaN channels and black tiles, silently.
+
+The arrow is a soft triangle, not a shaft-and-head arrow, and small: the tile's
+colour carries the picture, the mark on it only says which way. A single closed
+shape also survives being drawn tiny far better than a seven-point outline. That threshold sits high on
 purpose — a board of mostly white arrows reads as one set, and only genuinely
 pale faces like a cream muzzle break away.
 

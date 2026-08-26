@@ -10,7 +10,7 @@ import { boot } from '../shared/boot.js';
 import { COLOR, TYPE, ACCENT } from '../shared/tokens.js';
 import { LEVELS } from './levels.js';
 import { carve } from './carve.js';
-import { drawTile, roundRect } from './style.js';
+import { drawTile, roundRect, tone } from './style.js';
 
 const NAME = 'unpuzzle';
 const ACC = ACCENT[NAME];
@@ -106,13 +106,13 @@ function loadLevel(i) {
     // shows the moment a tile slides off, so the picture is drawn in dots as the
     // board empties instead of leaving a grey hole behind.
     dots: carved.tiles.map((t) => ({
-      x: t.x, y: t.y, color: t.color,
+      x: t.x, y: t.y, color: tone(t.color, t.x, t.y),
       // The finish sweeps outward from the middle instead of flashing at once.
       wake: Math.hypot(t.x - midX, t.y - midY) * 0.035,
     })),
     palette: [...new Set(carved.tiles.map((t) => t.color))],
     tiles: carved.tiles.map((t) => ({
-      x: t.x, y: t.y, color: t.color, dir: t.dir,
+      x: t.x, y: t.y, color: tone(t.color, t.x, t.y), dir: t.dir,
       gone: false, slide: null, bounce: 0, jiggle: 0, press: 0,
       // Tiles arrive from the middle outwards, so the animal assembles itself
       // rather than appearing all at once.
@@ -381,7 +381,11 @@ function update(dt, game) {
     if (b.ring) b.ring += b.grow * dt;
   }
 
-  if (alive === 0 && clearT < 0) {
+  // `board.tiles.length` is checked, not just `alive`: an empty tiles array
+  // leaves alive at 0 and would mark the level complete the instant it loaded.
+  // Nothing produces an empty board today, and this stays cheap insurance —
+  // progress that writes itself is the one bug a player cannot undo.
+  if (alive === 0 && board.tiles.length > 0 && clearT < 0) {
     clearT = 0;
     clearStep = 0;
     confetti();

@@ -39,10 +39,23 @@ export const PIECE = {
 
 // The tile carries the picture, so its thickness and its arrow are both derived
 // from its own colour rather than being fixed.
+// Returns hex, not rgb(): the result is fed back into shade() and arrowInk(),
+// both of which parse hex. Mixing the two formats silently produces NaN
+// channels and black tiles.
 function shade(hex, k) {
   const n = parseInt(hex.slice(1), 16);
-  const f = (c) => Math.round(c * k);
-  return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  const f = (c) => Math.max(0, Math.min(255, Math.round(c * k)));
+  const v = (f((n >> 16) & 255) << 16) | (f((n >> 8) & 255) << 8) | f(n & 255);
+  return '#' + v.toString(16).padStart(6, '0');
+}
+
+// A large field of one flat colour reads as a slab. Nudging each tile a few
+// percent either way by its own coordinates turns it into a surface — richer at
+// a glance, and still obviously one colour. Deterministic, so it is computed
+// once at load and never per frame.
+export function tone(hex, x, y) {
+  const step = ((x * 7 + y * 13) % 5) - 2;      // -2..2
+  return shade(hex, 1 + step * 0.045);
 }
 
 // Blend toward another colour — used for the wash behind the board, which is the
@@ -90,27 +103,26 @@ export function roundRect(ctx, x, y, w, h, r) {
 // The shape points up at zero rotation, so this is how far to turn it.
 const TURN = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
 
-// A blocky arrow — shaft plus head — stroked in its own colour with round joins,
-// which is what softens the corners without a second path.
+// A soft triangle rather than the shaft-and-head arrow it replaced. Smaller, so
+// the tile's colour carries the picture instead of the mark on it; and a single
+// closed shape, which survives being drawn tiny far better than a seven-point
+// outline does. Stroked in its own colour with round joins — that is what
+// rounds the corners, no second path needed.
 function arrow(ctx, cx, cy, size, color, dir) {
-  const s = size * 0.30;
+  const s = size * 0.185;
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(TURN[dir]);
+  ctx.translate(0, -s * 0.12);
   ctx.beginPath();
-  ctx.moveTo(0, -s * 1.10);
-  ctx.lineTo(s * 1.00, -s * 0.05);
-  ctx.lineTo(s * 0.44, -s * 0.05);
-  ctx.lineTo(s * 0.44, s * 0.95);
-  ctx.lineTo(-s * 0.44, s * 0.95);
-  ctx.lineTo(-s * 0.44, -s * 0.05);
-  ctx.lineTo(-s * 1.00, -s * 0.05);
+  ctx.moveTo(0, -s * 1.12);
+  ctx.lineTo(s * 1.06, s * 0.72);
+  ctx.lineTo(-s * 1.06, s * 0.72);
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
-  ctx.lineWidth = size * 0.11;
+  ctx.lineWidth = size * 0.085;
   ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
   ctx.stroke();
   ctx.fill();
   ctx.restore();
