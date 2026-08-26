@@ -190,6 +190,11 @@ was a correction:
   means one path per band under a single `globalAlpha`.
 - **Colour variety comes from swapping scenes**, never from a second hue inside
   one. Scenes rotate every 5 points and crossfade via `mixScenes`.
+- **The hero is built like the world, not like a mascot.** One silhouette, lit
+  top-to-bottom by the same gradient the platforms use, with `ink` legs and eyes.
+  It first shipped as a two-blob mascot with a cream belly patch and an offset
+  drop-shade — sticker construction, and the only object on screen made that way,
+  which is exactly what made it stick out.
 - Nothing decorative goes in the gap the stick crosses.
 
 The six scenes are solved onto one *luminance* ladder rather than one HSL ladder,

@@ -136,7 +136,7 @@ export function drawHero(ctx, L, cam, pal, hero) {
   ctx.translate(hero.x - cam, hero.y);
   if (hero.spin) ctx.rotate(hero.spin);
   // Drawn oversized in world units so that after the zoom it still reads on a
-  // phone — a 1:1 hero at ZOOM 0.62 loses its face.
+  // phone — a 1:1 hero at this ZOOM loses its face.
   ctx.scale(HERO_SCALE, HERO_SCALE);
 
   // Squash keeps volume: what it loses in height it gains in width, pivoting on
@@ -147,35 +147,31 @@ export function drawHero(ctx, L, cam, pal, hero) {
   const crouch = (hero.crouch || 0) * 5;
   const step = hero.walkPhase != null ? Math.sin(hero.walkPhase) * 4 : 0;
 
+  // Legs in ink — the hero belongs to the foreground, and the foreground is one
+  // family with the pillars.
   ctx.fillStyle = pal.ink;
-  roundRect(ctx, -9 + step, -10, 6, 10, 3);
-  roundRect(ctx, 3 - step, -10, 6, 10, 3);
+  roundRect(ctx, -8 + step, -9, 5, 9, 2.5);
+  roundRect(ctx, 3 - step, -9, 5, 9, 2.5);
 
-  ctx.fillStyle = pal.heroDeep;
-  roundRect(ctx, -12, -30 + crouch, 28, 24, 11);
-  ctx.fillStyle = pal.hero;
-  roundRect(ctx, -14, -32 + crouch, 28, 24, 11);
-
-  ctx.fillStyle = rgba(pal.glow, 0.85);
-  roundRect(ctx, -6, -24 + crouch, 12, 15, 6);
-
-  ctx.fillStyle = pal.heroDeep;
-  roundRect(ctx, -14, -58 + crouch, 32, 30, 13);
-  ctx.fillStyle = pal.hero;
-  roundRect(ctx, -16, -60 + crouch, 32, 30, 13);
+  // One silhouette, lit top to bottom exactly like a platform. No belly patch
+  // and no offset drop-shade: those read as sticker art, and nothing else in
+  // this game is built that way.
+  const top = -55 + crouch, bh = 47;
+  const body = ctx.createLinearGradient(0, top, 0, top + bh);
+  body.addColorStop(0, pal.hero);
+  body.addColorStop(1, pal.heroDeep);
+  ctx.fillStyle = body;
+  roundRect(ctx, -15, top, 30, bh, 14);
 
   ctx.fillStyle = pal.ink;
-  for (const ex of [-8, 4]) {
+  for (const ex of [-6.5, 2.5]) {
     ctx.beginPath();
-    ctx.ellipse(ex + 2, -49 + crouch, 2.5, 3.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex + 2, top + 16, 2.6, 3.2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-// Positions come from the world, sizes are authored in screen pixels. Without
-// the counter-scale a 3px ring stroke would render at 1px once the camera pulls
-// back, and the +2 popup would be unreadable.
 export function drawEffects(ctx, L, cam, pal, fx) {
   const z = L.zoom;
   const sx = (wx) => (wx - cam) * z;
