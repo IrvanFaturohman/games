@@ -75,8 +75,18 @@ purpose — a board of mostly white arrows reads as one set, and only genuinely
 pale faces like a cream muzzle break away.
 
 ```js
-{ name: 'kucing', art: ['.P...P.', ...], palette: { P: PIECE.pink, ... }, seed: 7 }
+{ name: 'kucing', art: ['.P.....P.', ...], palette: { P: PIECE.pink, ... }, seed: 7 }
 ```
+
+**Draw portrait.** The board is judged on a phone held upright, so art wider than
+it is tall wastes the screen twice over — vertical space sits empty and the tiles
+come out small because width is the binding constraint. Roughly **9 columns by
+11–12 rows** fills a phone with ~38px tiles, about the smallest a thumb wants.
+That is 60–75 tiles a level, which is also where a picture starts having enough
+resolution to read as an animal rather than a blob.
+
+Pick animals that are naturally upright for the same reason — a fish drawn side
+on is a landscape shape and fought the frame; a rabbit's ears fill it.
 
 `carve.js` decides which way each arrow points at load, and it **peels rather
 than guesses**: take a tile with a clear straight run to an edge given what is
