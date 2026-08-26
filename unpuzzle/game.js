@@ -10,7 +10,7 @@ import { boot } from '../shared/boot.js';
 import { COLOR, TYPE, ACCENT } from '../shared/tokens.js';
 import { LEVELS } from './levels.js';
 import { carve } from './carve.js';
-import { drawTile, drawGhost, roundRect, mix } from './style.js';
+import { drawTile, drawGhost, roundRect } from './style.js';
 
 const NAME = 'unpuzzle';
 const ACC = ACCENT[NAME];
@@ -39,8 +39,8 @@ const bits = [];
 
 function spark(x, y, color, opts = {}) {
   if (bits.length >= MAX_BITS) return;
-  const { vx = 0, vy = 0, life = 0.5, size = 6, grav = 0, spin = 0 } = opts;
-  bits.push({ x, y, vx, vy, life, max: life, size, color, grav, rot: 0, spin });
+  const { vx = 0, vy = 0, life = 0.5, size = 6, grav = 0, spin = 0, back = false } = opts;
+  bits.push({ x, y, vx, vy, life, max: life, size, color, grav, rot: 0, spin, back });
 }
 
 // Deterministic spread — update has to stay reproducible, so the "randomness"
@@ -63,9 +63,6 @@ function loadLevel(i) {
     rows: carved.rows,
     total: carved.tiles.length,
     ghost: carved.tiles.map((t) => [t.x, t.y]),
-    // The wash behind the board is this level's dominant colour, pulled most of
-    // the way back to the page — so each animal brings its own mood with it.
-    wash: mix(dominant(carved.tiles), COLOR.bg, 0.86),
     palette: [...new Set(carved.tiles.map((t) => t.color))],
     tiles: carved.tiles.map((t) => ({
       x: t.x, y: t.y, color: t.color, dir: t.dir,
@@ -77,12 +74,6 @@ function loadLevel(i) {
   };
   clearT = -1;
   held = null;
-}
-
-function dominant(tiles) {
-  const count = new Map();
-  for (const t of tiles) count.set(t.color, (count.get(t.color) ?? 0) + 1);
-  return [...count].sort((a, b) => b[1] - a[1])[0][0];
 }
 
 // A tile that has committed to leaving no longer occupies the board, so taps can
@@ -193,17 +184,11 @@ function tileAt(px, py) {
 
 // onResize never fires for the initial size, so this is called once from ready
 // and again on every change. The URL bar sliding away on iOS is a change.
-const WASH_PAD = 0.62;   // in cells, on every side of the board
-
 function layout(stage) {
   const padX = 22, top = 156, bottom = 82;
-  const skirt = WASH_PAD * 2;                 // the wash sits outside the board
   const availW = stage.w - padX * 2;
   const availH = stage.h - top - bottom;
-  const cell = Math.floor(Math.min(
-    availW / (board.cols + skirt),
-    availH / (board.rows + skirt),
-  ));
+  const cell = Math.floor(Math.min(availW / board.cols, availH / board.rows));
   view = {
     cell,
     ox: Math.round((stage.w - cell * board.cols) / 2),
@@ -233,6 +218,18 @@ function update(dt, game) {
 
     if (t.slide) {
       t.slide.t += dt;
+      // Stamp a mark every ~22ms of travel. Echoes alone vanish with the tile;
+      // these outlive it, which is what makes the path readable after the fact.
+      if (t.slide.t > SLIDE_WIND) {
+        t.slide.ink = (t.slide.ink ?? 0) + dt;
+        if (t.slide.ink >= 0.022) {
+          t.slide.ink = 0;
+          const p = poseOf(t);
+          spark(view.ox + p.x + (t.x + 0.5) * view.cell,
+                view.oy + p.y + (t.y + 0.5) * view.cell, t.color,
+                { life: 0.30, size: view.cell * 0.66, back: true });
+        }
+      }
       if (!t.slide.left && t.slide.t >= SLIDE_DUR * 0.55) {
         t.slide.left = true;
         game.audio.play('whoosh');
@@ -289,29 +286,21 @@ function render(c, game) {
     c.translate(Math.sin(shake * 91) * shake * 7, Math.cos(shake * 67) * shake * 7);
   }
 
-  drawWash(c);
   drawBoardGhost(c);
+  drawBits(c, true);
   for (const t of board.tiles) drawOne(c, t);
-  drawBits(c);
+  drawBits(c, false);
   c.restore();
 
   drawHud(c, stage);
   if (clearT >= 0) drawClear(c, stage);
 }
 
-// A panel behind the board in the level's own colour. Without it the tiles float
-// in an empty page, which is the difference between a screen and a screenshot.
-function drawWash(c) {
-  const { ox, oy, cell } = view;
-  const pad = cell * WASH_PAD;
-  roundRect(c, ox - pad, oy - pad,
-    board.cols * cell + pad * 2, board.rows * cell + pad * 2, cell * 0.55);
-  c.fillStyle = board.wash;
-  c.fill();
-}
-
-function drawBits(c) {
+// Trail marks are laid down behind the tiles; dust, sparks and confetti go on
+// top. Same array, two passes — a moving tile has to stay above its own smear.
+function drawBits(c, back) {
   for (const b of bits) {
+    if (!!b.back !== back) continue;
     const k = b.life / b.max;
     const s = b.size * (0.45 + k * 0.55);
     c.save();
@@ -390,14 +379,13 @@ function drawOne(c, t) {
   const { ox, oy, cell } = view;
   const p = poseOf(t);
 
-  // Echoes strung out behind a moving tile. Three is enough to read as speed;
-  // more just costs fill rate for something on screen a quarter of a second.
+  // Echoes strung out behind a moving tile, on top of the stamped trail.
   if (t.slide && t.slide.t > SLIDE_WIND) {
-    for (let i = 3; i >= 1; i--) {
-      const f = 1 - i * 0.13;
+    for (let i = 5; i >= 1; i--) {
+      const f = 1 - i * 0.11;
       drawTile(c, ox + p.x * f + t.x * cell, oy + p.y * f + t.y * cell, cell, t.color, t.dir, {
-        alpha: p.alpha * (0.22 - i * 0.05),
-        scale: p.scale * (1 - i * 0.05),
+        alpha: p.alpha * (0.46 - i * 0.07),
+        scale: p.scale * (1 - i * 0.045),
         stretch: p.stretch,
       });
     }

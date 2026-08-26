@@ -211,9 +211,12 @@ from the particle index so a replay is identical.
   not answer the finger until it has already decided to move feels dead.
 - **Anticipation before the slide.** The tile loads up 0.16 cells *against* its
   arrow for 70 ms before it goes. Without it, leaving reads as a teleport.
-- **Stretch along the travel axis**, plus **three echoes** strung out behind a
-  moving tile. Three is enough to read as speed; more costs fill rate for
-  something on screen a quarter of a second.
+- **Stretch along the travel axis**, plus **five echoes** strung out behind a
+  moving tile, plus a **stamped trail**: a mark laid down every ~22 ms of travel
+  that outlives the tile. Echoes alone disappear the instant the tile does, which
+  is exactly when the eye goes looking for where it went. Trail marks are drawn
+  *behind* the tiles and everything else in front, so a moving tile stays above
+  its own smear — same `bits` array, two passes.
 - **Dust at the origin cell, not at the exit.** The eye is still where the tap
   landed, so that is where a departure has to register.
 - **The blocker answers too.** A refused move shakes the tile twice toward its
@@ -237,15 +240,12 @@ shake has nothing else to mean.
 
 ## Screen furniture
 
-Tiles on an empty page look like a screenshot rather than a screen, so:
+**Pills, not labels.** `LEVEL n` on the left, the count on the right, and the
+animal's name as the screen's title rather than a third equal label.
 
-- A **wash panel** behind the board, filled with the level's own dominant colour
-  pulled 86% back toward the page — each animal brings its own mood. `layout`
-  reserves `WASH_PAD` cells on every side for it; without that reservation the
-  panel is sized off a board that already claimed the full width and bleeds off
-  the screen.
-- **Pills, not labels.** `LEVEL n` on the left, the count on the right, and the
-  animal's name as the screen's title rather than a third equal label.
+A coloured wash panel behind the board was tried and removed — the user did not
+want a background behind the tiles. The page stays flat cream. If the board ever
+needs grounding again, it should not be a tinted slab.
 
 ## Assets
 
