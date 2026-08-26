@@ -1,47 +1,66 @@
-// Levels are data, never code, so difficulty can be retuned without touching
-// logic. A piece is `{cells, dir, color}` in board-grid coordinates.
+// Levels are pictures. Nothing else is authored — `carve.js` cuts the silhouette
+// into pieces and works out every exit direction at load, so there is no piece
+// table or exit table to keep in sync with the art.
 //
-// These three are test material for proving the feel, not the real set. The
-// shipped levels need a solver verifying each one is actually clearable —
-// difficulty comes from dependency depth, not piece count.
+// One letter per colour, '.' for empty. Draw the animal, pick a palette, mark
+// where the eyes go, and that is the whole level. Eyes are painted on rather
+// than being pieces: pieces only ever leave, so a piece fully enclosed by
+// another could never get out and would deadlock the board.
+//
+// After editing, check every level still carves:  node unpuzzle/tools/author.mjs
 
 import { PIECE } from './style.js';
 
 export const LEVELS = [
-  // 1 — teach the verb. Every piece is already free; failing is not possible.
   {
-    cols: 4, rows: 4,
-    pieces: [
-      { cells: [[0, 0], [1, 0]], dir: 'up',    color: PIECE.coral },
-      { cells: [[3, 1], [3, 2]], dir: 'right', color: PIECE.blue },
-      { cells: [[1, 3], [2, 3]], dir: 'down',  color: PIECE.amber },
+    name: 'anak ayam',
+    art: [
+      '....R....',
+      '...RRR...',
+      '..YYYYY..',
+      '.YYYYYYY.',
+      'OYYYYYYY.',
+      '.YYYYYYY.',
+      '.YYYYYYY.',
+      '..YYYYY..',
+      '..O...O..',
     ],
+    palette: { R: PIECE.coral, Y: PIECE.amber, O: PIECE.orange },
+    eyes: [[3, 3], [5, 3]],
+    seed: 11,
   },
 
-  // 2 — one dependency: the green pair cannot leave until the coral single does.
   {
-    cols: 5, rows: 5,
-    pieces: [
-      { cells: [[2, 0]],         dir: 'up',    color: PIECE.coral },
-      { cells: [[2, 1], [2, 2]], dir: 'up',    color: PIECE.green },
-      { cells: [[0, 2], [1, 2]], dir: 'left',  color: PIECE.violet },
-      { cells: [[4, 3]],         dir: 'right', color: PIECE.amber },
+    name: 'ikan',
+    art: [
+      '........VV.',
+      '..SSSSS.VV.',
+      '.SSSSSSSVV.',
+      'CSSSSSSSVVV',
+      '.SSSSSSSVV.',
+      '..SSSSS.VV.',
+      '........VV.',
     ],
+    palette: { S: PIECE.sky, V: PIECE.violet, C: PIECE.coral },
+    eyes: [[2, 3]],
+    seed: 23,
   },
 
-  // 3 — two independent chains, two cells deep each. Note that picking a bad
-  // order cannot lose: pieces only ever leave, so blockers only ever disappear
-  // and a blocked piece always frees up eventually. The difficulty is search,
-  // not strategy.
   {
-    cols: 5, rows: 5,
-    pieces: [
-      { cells: [[0, 0], [1, 0], [2, 0]], dir: 'up',    color: PIECE.amber },
-      { cells: [[1, 1], [1, 2]],         dir: 'up',    color: PIECE.green },
-      { cells: [[0, 2], [0, 3]],         dir: 'left',  color: PIECE.blue },
-      { cells: [[2, 2], [3, 2], [4, 2]], dir: 'right', color: PIECE.violet },
-      { cells: [[3, 3], [3, 4]],         dir: 'down',  color: PIECE.orange },
-      { cells: [[2, 3]],                 dir: 'left',  color: PIECE.coral },
+    name: 'kucing',
+    art: [
+      '.PP...PP.',
+      '.OOOOOOO.',
+      'OOOOOOOOO',
+      'OOOOOOOOO',
+      '.OOOOOOO.',
+      '..OOOOO..',
+      '.OOOOOOOT',
+      '.OOOOOOOT',
+      '.AA...AA.',
     ],
+    palette: { P: PIECE.pink, O: PIECE.orange, T: PIECE.orange, A: PIECE.amber },
+    eyes: [[3, 2], [5, 2]],
+    seed: 7,
   },
 ];

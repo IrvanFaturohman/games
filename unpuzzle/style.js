@@ -29,6 +29,9 @@ export const PIECE = {
   blue:   '#4D9DE0',
   violet: '#A06CD5',
   orange: '#FF9F45',
+  sky:    '#8ED2F5',
+  pink:   '#FF9BC2',
+  ink:    COLOR.base,
 };
 
 // Written out rather than using ctx.roundRect, which only reached Safari in
@@ -83,11 +86,24 @@ function piecePath(cells, has, ox, oy, cell, grow) {
   return path;
 }
 
+// The animal's full footprint, faint, under everything. Pieces cover it exactly,
+// so it only shows where one has already left — and once the board is clear it
+// is the whole silhouette, which is what the player spent the level taking apart.
+export function drawGhost(ctx, cells, ox, oy, cell) {
+  const set = new Set(cells.map(([x, y]) => x + ',' + y));
+  const has = (x, y) => set.has(x + ',' + y);
+  ctx.save();
+  ctx.fillStyle = COLOR.line;
+  ctx.globalAlpha = 0.55;
+  ctx.fill(piecePath(cells, has, ox, oy, cell, 0));
+  ctx.restore();
+}
+
 // Three fills of the same footprint: offset silhouette, white edge, body.
 // Deliberately not ctx.shadowBlur — a blurred shadow per piece per frame is the
 // kind of thing that quietly costs frames on a mid-range phone, and at this size
 // the offset version is indistinguishable.
-export function drawPiece(ctx, cells, has, ox, oy, cell, color, alpha = 1) {
+export function drawPiece(ctx, cells, has, ox, oy, cell, colorAt, alpha = 1) {
   const edge = GEO.outline * cell;
   const outer = piecePath(cells, has, ox, oy, cell, edge);
   const body  = piecePath(cells, has, ox, oy, cell, 0);
@@ -103,7 +119,13 @@ export function drawPiece(ctx, cells, has, ox, oy, cell, color, alpha = 1) {
   ctx.globalAlpha = alpha;
   ctx.fillStyle = COLOR.white;
   ctx.fill(outer);
-  ctx.fillStyle = color;
-  ctx.fill(body);
+  // The picture rides the piece: every cell keeps its own colour from the art,
+  // clipped to the piece outline so the sticker edge stays one clean shape and
+  // a single piece can carry more than one colour.
+  ctx.clip(body);
+  for (const [cx, cy] of cells) {
+    ctx.fillStyle = colorAt(cx, cy);
+    ctx.fillRect(ox + cx * cell - 0.5, oy + cy * cell - 0.5, cell + 1, cell + 1);
+  }
   ctx.restore();
 }

@@ -33,17 +33,21 @@ wrong on a phone, before suspecting game code.
 
 ## Current state
 
-`game.js` is still the scaffold stub — it counts taps and pulses a square to
-prove the shell boots, renders, and takes input on device. There is no
-`levels.js`, no `assets/`, no board, no piece, no collision. Everything below is
-spec, not description.
+The core is playable: `carve.js` turns pictures into puzzles, `game.js` runs the
+board, three animals ship in `levels.js`. Verified in a desktop browser only —
+slide feel, flick threshold and audio have never been judged on a phone, which is
+the one place that counts.
 
 ## Core loop
 
-A board holds interlocking pieces. Each piece can only exit in one direction.
+The pieces sit together as an animal. Each piece can only exit in one direction.
 Tap (or flick) a piece → it slides that way and leaves the board, but only if
-nothing blocks its path. Clear every piece to finish the level. No timer, no
-fail state — the pressure is purely "which one first".
+nothing blocks its path. Clearing the board takes the animal apart and leaves its
+silhouette behind. No timer, no fail state — the pressure is purely "which one
+first".
+
+Note the neighbour: polygram is *fit shapes into a silhouette*. Unpuzzle must
+stay the taking-apart game, or the two collapse into each other.
 
 ## The one hard problem
 
@@ -55,15 +59,52 @@ do not try to do this with bounding boxes and pixel math.
 Illegal taps must still feel answered: nudge the piece a few pixels toward its
 exit and bounce back, plus a dull thunk. Silence reads as a broken tap.
 
-## Level data
+## Levels are pictures
 
-Levels are data, not code — a JSON array of `{cells, dir, color}`. Author them
-in a `levels.js` file so difficulty can be retuned without touching logic.
-Every level must be verified solvable by a solver before shipping; a hand-made
-unsolvable level is the fastest way to lose a player permanently.
+A level is art and nothing else — an ASCII grid, one letter per colour, plus a
+palette, eye positions and a seed. `carve.js` cuts the silhouette into polyomino
+pieces and assigns every exit direction at load. There is no piece table and no
+exit table to keep in sync with the drawing.
 
-Difficulty comes from **dependency depth** (piece A must leave before B, which
-must leave before C), not from piece count.
+```js
+{ name: 'kucing', art: ['.PP...PP.', ...], palette: { P: PIECE.pink, ... },
+  eyes: [[3, 2], [5, 2]], seed: 7 }
+```
+
+Exits are **peeled, never guessed**: take a piece with a clear straight run to an
+edge given what is still on the board, assign it that direction, remove it,
+repeat. The peel order is by construction a solution, so a carve that returns at
+all is a level that can be finished. A cut that boxes a piece in is discarded and
+re-cut with the next seed.
+
+**No piece may be enclosed by another.** Pieces only ever leave, so an enclosed
+piece must wait for its ring — and every path the ring could take crosses the
+enclosed piece. That is a deadlock no exit assignment can repair, and it is why
+eyes are painted on rather than being pieces of their own. The carver detects it
+and re-cuts, but art that forces it will burn every try and throw.
+
+Check every level still carves after editing art:
+
+```
+node unpuzzle/tools/author.mjs
+```
+
+It reports piece count, piece sizes, and **free-on-turn-1** — how many pieces can
+move immediately. That is the only real difficulty knob, since the ruleset cannot
+dead-end (below). Organic silhouettes have most of their pieces on the boundary,
+so this number runs high and levels play loose; tightening it means art with more
+interior.
+
+## Difficulty is search, not strategy
+
+Picking a bad order cannot lose. Pieces only ever leave the board, never move to
+a new blocking position, so blockers only ever disappear and a blocked piece
+always frees up eventually. There is no dead end and no wrong move — only
+looking for which piece is free.
+
+That bounds what level design can achieve here. Real stakes would need a rule
+this game does not have: a move limit, a star target, or pieces that stop inside
+the board instead of leaving.
 
 ## The boot contract
 
