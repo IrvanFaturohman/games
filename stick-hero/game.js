@@ -279,8 +279,30 @@ function update(dt, game) {
   }
 }
 
+// Android Chrome can drop the canvas transform and backing store mid-session —
+// backgrounding the tab, or the URL bar animating. engine.js only re-applies the
+// DPR transform when the measured size changes, so once it is lost nothing puts
+// it back: the scene renders at 1x into the top-left quarter and the rest of the
+// canvas is never cleared again, which is why a falling hero smears down it.
+// Verified by forcing the transform to identity on desktop — identical picture.
+// Cheap enough to check every frame.
+function ensureCanvas(stage, ctx) {
+  const wantW = Math.round(stage.w * stage.dpr);
+  const wantH = Math.round(stage.h * stage.dpr);
+  if (ctx.canvas.width !== wantW || ctx.canvas.height !== wantH) {
+    ctx.canvas.width = wantW;
+    ctx.canvas.height = wantH;   // this alone resets the transform, so fall through
+  } else {
+    const t = ctx.getTransform();
+    if (t.a === stage.dpr && t.d === stage.dpr && t.b === 0 && t.c === 0) return;
+  }
+  ctx.setTransform(stage.dpr, 0, 0, stage.dpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+}
+
 function render(ctx, game) {
   const stage = game.stage;
+  ensureCanvas(stage, ctx);
   const pal = mixScenes(S.sceneFrom, S.sceneTo, S.mixT);
 
   ctx.save();

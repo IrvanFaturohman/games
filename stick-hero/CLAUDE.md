@@ -130,6 +130,26 @@ Squash pivots on the feet and trades height for width, so the hero never appears
 to sink into the platform. The flash is capped at `0.28` alpha — anything more
 reads as a whiteout rather than a hit.
 
+## The canvas can lose its transform mid-session
+
+Seen on a real Android phone, never on desktop: the scene suddenly renders at 1x
+into the **top-left quarter** of the canvas, and because the rest is no longer
+cleared each frame, a falling hero smears a trail down it. Both symptoms are one
+cause — the 2D context's DPR transform was reset (backgrounding the tab, the URL
+bar animating, the browser reclaiming the backing store).
+
+It never recovers because `resize()` in `shared/engine.js` only re-applies the
+transform when the measured size *changes*. Lose it without a resize and nothing
+puts it back.
+
+`ensureCanvas()` in `game.js` re-asserts the transform and the backing size every
+frame. Reproduce the fault with `ctx.setTransform(1,0,0,1,0,0)` or
+`canvas.width = 300` and confirm the next paint heals it.
+
+**This guard is local to stick-hero.** The underlying fragility is in
+`shared/engine.js` and unpuzzle and polygram have it too — raise it rather than
+patching `shared/` from here.
+
 ## Units: world vs screen
 
 `ZOOM` in `scene.js` is the camera. Below 1 it pulls back, so the visible world
