@@ -31,6 +31,9 @@ export const PIECE = {
   sea:    '#7CC8E8',
   pink:   '#FF9BC2',
   cream:  '#FFE7BE',
+  leaf:   '#5DBB63',
+  wood:   '#B0763F',
+  plum:   '#7E57A6',
   ink:    '#4A3B36',
 };
 

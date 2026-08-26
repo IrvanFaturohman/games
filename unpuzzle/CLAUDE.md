@@ -80,13 +80,17 @@ pale faces like a cream muzzle break away.
 
 **Draw portrait.** The board is judged on a phone held upright, so art wider than
 it is tall wastes the screen twice over — vertical space sits empty and the tiles
-come out small because width is the binding constraint. Roughly **9 columns by
-11–12 rows** fills a phone with ~38px tiles, about the smallest a thumb wants.
-That is 60–75 tiles a level, which is also where a picture starts having enough
-resolution to read as an animal rather than a blob.
+come out small because width is the binding constraint. **7–9 columns by 9–12
+rows** is the useful range; a 9×11 board fills a phone with ~38px tiles, about
+the smallest a thumb wants.
 
-Pick animals that are naturally upright for the same reason — a fish drawn side
-on is a landscape shape and fought the frame; a rabbit's ears fill it.
+Subject matter is not limited to animals — plants, fruit, food and objects all
+work, and many of them are naturally upright, which the frame rewards. A fish
+drawn side on is a landscape shape and fought the frame; a carrot, a rocket or a
+rabbit's ears fill it.
+
+Tile count *is* the difficulty, so `LEVELS` runs roughly small to large: 28 for
+the cactus up to 74 for the bear.
 
 `carve.js` decides which way each arrow points at load, and it **peels rather
 than guesses**: take a tile with a clear straight run to an edge given what is
