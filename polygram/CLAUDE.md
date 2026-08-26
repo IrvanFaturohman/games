@@ -32,11 +32,27 @@ authored level is by construction solvable. Store as JSON in `levels.js`.
 Start with classic 7-piece tangram sets — they are well documented, known
 solvable, and give a real difficulty curve for free before any custom shape work.
 
-## Feel details worth the effort
+## Feel, and the one rule it must not break
 
-Piece lifts and scales slightly on grab · target slot ghosts in when a piece is
-near · satisfying click on snap · silhouette fills in accent colour piece by
-piece · completed shape gets a short celebratory beat before the next level.
+Built: eased rotation · piece pops and thickens on grab and tilts into the drag ·
+the slot under a carried piece lifts and breathes in that piece's colour · shard
+burst, white flash, quadratic shake and a rising pitch per snap · confetti,
+a ripple through the pieces in slot order, a three-note fanfare and a card that
+pops in on a finished silhouette · `navigator.vibrate` on snap and win, guarded.
+
+**No animating value may reach the snap test.** `rDisp`, `pop`, `lean`, `grown`,
+`hold`, `wob` and `shake` are display-only; `candidate()` reads the logical `p.r`
+at the settled `view.s`. Three separate snap bugs came from breaking this, and
+each one presented as "sometimes it just doesn't grab" — the lift easing moved
+the snap point, the grow tween had a flick tested as a tray-sized piece, and a
+tap's own pointermove lifted the piece 40 px on every rotate. The lift is now
+instant and gated on `p.moved`, and release bakes it into the position.
+
+The near miss matters as much as the hit. Drop a piece on a slot it is turned
+wrong for and it wobbles, the slot pulses, and a dull `tap` at `rate 0.4` plays.
+Silence there reads as a broken drop, and the rotate verb is what a first-timer
+has not found yet — which is also why a one-time accent pill says
+`TAP KEPING UNTUK PUTAR` until they rotate something.
 
 ## Visual direction
 
@@ -107,6 +123,16 @@ the same coordinate, and lifting for that shoves the piece up on every rotate);
 on release the lift is baked into the position rather than eased away; and
 `candidate()` tests at the settled board scale, never at the tween's current
 one. Only the grow tween is still animated, and nothing reads it but the draw.
+
+Also built: a reset button in the HUD, and dropping a piece back over the tray
+returns it there instead of leaving it stranded on the board.
+
+`__debug` is published on localhost only — `step(n)`, `paint()`, `state()`.
+**`requestAnimationFrame` is throttled to a crawl in a background tab**, so an
+automated check that merely waits sees a frozen game and cannot tell it from a
+hung one. Drive the clock with `__debug.step()` instead of sleeping; that is how
+the win card's `winT > 0.7` gate was verified at all. stick-hero publishes the
+same hook for the same reason.
 
 Not done: tuning on a real phone — every number here is a desk guess — and more
 levels.
