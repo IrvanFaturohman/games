@@ -31,9 +31,26 @@ wrong on a phone, before suspecting game code.
 
 ## Current state
 
-`game.js` is still the scaffold stub — it counts taps and draws `assets/hero.svg`
-to prove the Figma → SVG → Pages → phone chain works. Replacing it with the real
-loop is the job.
+The core loop is built and playable. Three files:
+
+| File | Holds |
+|---|---|
+| `style.js` | tokens, the six scenes, `PARALLAX`/`LAYERS`/`OPACITY`, `mixScenes` |
+| `scene.js` | every draw call — pure rendering, no state, no timing |
+| `game.js` | the state machine, input, and generation |
+
+`game.js` runs a phase machine: `idle → growing → falling → walking →
+scroll → idle`, with `dropping → dead` on a miss. Landing the tip within
+`PERFECT_HALF` of the target centre scores double.
+
+On localhost only, `boot()` publishes `window.__debug` with `step(n)`,
+`paint()` and the live state. This exists because **`requestAnimationFrame` is
+suspended in a background tab**, so an automated check that just waits will see
+nothing advance and look exactly like a hung game. Drive the loop with
+`__debug.step()` and force a frame with `__debug.paint()` instead of sleeping.
+
+`assets/hero.svg` is no longer loaded — the hero is canvas primitives now. The
+file is kept only as the original Figma-export proof.
 
 ## The shell contract
 
@@ -98,17 +115,53 @@ Stick rotation eased rather than linear · hero walk cycle as two alternating
 rectangles · camera scroll eased over ~0.4s · screen shake on a fall · the stick
 wobbles slightly at full extension.
 
-## Assets
+## Art direction
 
-Mostly canvas primitives — do not export rectangles from Figma. The Figma file
-(`3MCjOe4tnvd5wTM4tPtE4Y`) holds the hero sprite, background silhouette layers,
-and UI marks only. Load through `loadAll()` from `../shared/assets.js`.
+Everything is drawn; there are no image assets in the loop. The rules are in the
+header comment of `style.js` and they are not stylistic preferences — each one
+was a correction:
+
+- **No outlines, ever.** Shapes separate by value and hue. If two shapes do not
+  read apart, the tones are too close — do not reach for a stroke.
+- **One scene, one hue — foreground included.** Background bands are all painted
+  in the *same* colour (`veil`) and separated only by opacity. `ink` is the scene
+  hue at its darkest; a neutral black reads as a foreign hue and stops the whole
+  composition cohering.
+- **Opacity goes on the layer, never the shapes.** Per-shape alpha makes overlaps
+  inside one band darken twice and the band shows its own seams. In canvas that
+  means one path per band under a single `globalAlpha`.
+- **Colour variety comes from swapping scenes**, never from a second hue inside
+  one. Scenes rotate every 5 points and crossfade via `mixScenes`.
+- Nothing decorative goes in the gap the stick crosses.
+
+The six scenes are solved onto one *luminance* ladder rather than one HSL ladder,
+so every scene has the same contrast structure (sky 0.45 → 0.93, ink ~0.07) and
+no level is harder to read than another. That is also what makes `mixScenes`
+safe: rung *i* of any two scenes means the same depth.
+
+The Figma file (`3MCjOe4tnvd5wTM4tPtE4Y`) mirrors this: `tokens` for the unthemed
+parts, `scene` with one mode per entry in `SCENES`. Frame "Stick Hero / Play" and
+the "Scenes" comparison strip live on the Assets page. Change code and Figma in
+the same pass.
+
+**Two Figma traps, both hit while building this.** A paint whose colour is bound
+to a variable renders from the binding and drops the rest: `setBoundVariableForPaint`
+sometimes leaves the literal at `{0,0,0}` and the shape goes solid black, and
+alpha inside a bound gradient stop is ignored entirely. Build such paints by hand
+— resolve the value through any alias chain and write both `color` and
+`boundVariables` — and fade by landing the outer stop on the neighbouring colour
+plus node opacity. Read `fills[0].color` back to verify; a `screenshot()` taken
+inside the same call can still show the pre-edit render. Separately, `addMode()`
+invalidates the collection handle, so `setValueForMode` calls after it in the
+same script fail silently — split them into two calls and verify.
 
 ## Conventions
 
 - **Player-facing copy is Indonesian** (`TAP UNTUK MULAI`, the hub cards, the test
   page). Code, comments, and commit messages stay English.
-- No raw hex in `game.js` — pull from `../shared/tokens.js` (`COLOR`,
-  `ACCENT['stick-hero']`, `TYPE`, `SPACE`). Figma binds the same tokens; raw
-  values are how the two drift apart.
+- No raw hex in `game.js` or `scene.js` — pull from `./style.js`, which extends
+  `../shared/tokens.js` rather than redefining it. Figma binds the same tokens;
+  raw values are how the two drift apart.
+- `shared/tokens.js` still holds the old flat system that unpuzzle and polygram
+  render with, and stays untouched until this look is proven on a phone.
 - `shared/` is used by all three games — raise any change there with the user first.
