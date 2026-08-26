@@ -81,9 +81,12 @@ in which case it becomes a deep tint of the face.
 `shade()` and `arrowInk()`, both of which parse hex. Returning `rgb()` produces
 NaN channels and black tiles, silently.
 
-The arrow is a soft triangle, not a shaft-and-head arrow, and small: the tile's
-colour carries the picture, the mark on it only says which way. A single closed
-shape also survives being drawn tiny far better than a seven-point outline. That threshold sits high on
+The arrow is small — the tile's colour carries the picture, the mark on it only
+says which way — but it keeps its **tail**. A bare triangle was tried and read as
+ambiguous: it points, but only once you have worked out which corner is the tip,
+and rotated it makes players hesitate. The tail answers that instantly and is
+worth the extra points on the path. The stem tapers slightly toward the back,
+which is the difference between a drawn arrow and a default one. That threshold sits high on
 purpose — a board of mostly white arrows reads as one set, and only genuinely
 pale faces like a cream muzzle break away.
 

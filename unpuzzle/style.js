@@ -103,25 +103,34 @@ export function roundRect(ctx, x, y, w, h, r) {
 // The shape points up at zero rotation, so this is how far to turn it.
 const TURN = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
 
-// A soft triangle rather than the shaft-and-head arrow it replaced. Smaller, so
-// the tile's colour carries the picture instead of the mark on it; and a single
-// closed shape, which survives being drawn tiny far better than a seven-point
-// outline does. Stroked in its own colour with round joins — that is what
-// rounds the corners, no second path needed.
+// Head plus tail, not a bare triangle.
+//
+// A triangle on its own points, but only once you have worked out which corner
+// is the tip — rotate it and players hesitate. The tail removes the question
+// instantly, so it stays even though it costs a few points on the path.
+//
+// Slimmer and smaller than the original chunky arrow: the tile's colour carries
+// the picture, and the mark on it only has to say which way. The stem tapers
+// slightly toward the back, which is the difference between a drawn arrow and a
+// default one. Stroked in its own colour with round joins — that rounds the
+// corners without a second path.
 function arrow(ctx, cx, cy, size, color, dir) {
-  const s = size * 0.185;
+  const s = size * 0.235;
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(TURN[dir]);
-  ctx.translate(0, -s * 0.12);
   ctx.beginPath();
-  ctx.moveTo(0, -s * 1.12);
-  ctx.lineTo(s * 1.06, s * 0.72);
-  ctx.lineTo(-s * 1.06, s * 0.72);
+  ctx.moveTo(0, -s * 1.15);
+  ctx.lineTo(s * 0.95, -s * 0.02);
+  ctx.lineTo(s * 0.34, -s * 0.02);
+  ctx.lineTo(s * 0.26, s * 0.98);
+  ctx.lineTo(-s * 0.26, s * 0.98);
+  ctx.lineTo(-s * 0.34, -s * 0.02);
+  ctx.lineTo(-s * 0.95, -s * 0.02);
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
-  ctx.lineWidth = size * 0.085;
+  ctx.lineWidth = size * 0.08;
   ctx.lineJoin = 'round';
   ctx.stroke();
   ctx.fill();
