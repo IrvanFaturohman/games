@@ -16,11 +16,30 @@ games/
   test/           device diagnostic page
 ```
 
+## Who owns what
+
 Each game is worked on in **its own Claude Code session**, from its own clone
 (see "One clone per session" below — the clone root *is* this repo root, there is
-no `games/` directory inside it), driven by its own remote control. Only touch
-your own game's folder; `shared/` changes affect all three, so raise them with
-the user first.
+no `games/` directory inside it), driven by its own remote control.
+
+| Path | Who may change it |
+|---|---|
+| `stick-hero/`, `unpuzzle/`, `polygram/` | that game's session, and only that one — including the folder's own `CLAUDE.md` |
+| `shared/`, this root `CLAUDE.md`, `index.html`, `test/` | nobody unilaterally; raise it with the user first |
+
+**The boundary covers the other games' docs, not just their code.** Noticing that
+another game's `CLAUDE.md` is thin, stale, or plainly wrong is not a licence to
+fix it. Say so and let the user route it to the session that owns it.
+
+This is not bookkeeping. A session that edits a folder it does not own creates
+the merge conflict this whole layout exists to prevent, and the conflict lands on
+whoever pushes *second* — never on the session that caused it. It has already
+happened once: two sessions independently corrected the same shell-contract
+mistake, one of them reaching into a game folder that was not its own, and the
+second push had to reconcile both files by hand.
+
+It runs the other way too. If your game needs something from `shared/`, ask for
+it — do not add it locally, and do not copy it out of another game's folder.
 
 ## Constraints that drive everything
 
@@ -143,16 +162,23 @@ git push                 # Pages rebuilds in ~30s
 ```
 
 If the push is rejected, someone pushed first: repeat `git pull --rebase`, then
-push again. Because each session only touches its own game folder, the rebase
-replays cleanly with nothing to resolve.
+push again. While every session stays inside its own folder the rebase replays
+cleanly and there is nothing to resolve.
 
 ```
 https://irvanfaturohman.github.io/games/<game>/
 ```
 
-A real merge conflict is only possible in `shared/`, the one place all three
-games meet — which is why changes there are raised with the user first. If one
-happens, fix the marked file, `git add` it, then `git rebase --continue`.
+A real conflict means two sessions touched the same file — either somewhere they
+legitimately meet (`shared/`, this `CLAUDE.md`, `index.html`, `test/`) or because
+one of them crossed into a folder it does not own. Fix the marked file, `git add`
+it, then `git rebase --continue`.
+
+Resolve it, never `--force`. The other session's side is not noise: it may well be
+the more correct of the two, and if it contradicts yours on a fact about the
+shell, check the shell rather than assuming yours was right. Reconciling by hand
+and keeping the better half of each is the expected outcome, and worth saying in
+the commit message so the next session can see which claim won.
 
 Never delete `.nojekyll`; without it Pages hides any underscore-prefixed path.
 
