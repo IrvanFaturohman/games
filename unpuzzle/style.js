@@ -17,13 +17,9 @@ export const GEO = {
   shadowAlpha:  0.13,
 };
 
-// The tile face is one colour for every tile, as in the reference — the picture
-// is carried by the silhouette and the arrow colours, not by the tiles.
-export const TILE = { face: '#F7E7C9', edge: '#DFC395' };
-
-// Arrow colours are game content, not suite tokens — stick-hero and polygram
-// have no tiles. These mirror the `color/piece-*` variables in this game's
-// Figma file; change both together or they drift.
+// Tile colours are game content, not suite tokens — stick-hero and polygram have
+// no tiles. These mirror the `color/piece-*` variables in this game's Figma file;
+// change both together or they drift.
 export const PIECE = {
   green:  ACCENT.unpuzzle,
   coral:  '#F0554B',
@@ -31,10 +27,29 @@ export const PIECE = {
   blue:   '#4D9DE0',
   violet: '#B05BC4',
   orange: '#E8762C',
-  sky:    '#6EC1E4',
+  sky:    '#4FB3DE',
+  sea:    '#7CC8E8',
   pink:   '#FF9BC2',
+  cream:  '#FFE7BE',
   ink:    '#4A3B36',
 };
+
+// The tile carries the picture, so its thickness and its arrow are both derived
+// from its own colour rather than being fixed.
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (c) => Math.round(c * k);
+  return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+
+// A white arrow vanishes on a cream muzzle and a dark one vanishes on an eye, so
+// pick per tile by luminance. The threshold sits high on purpose: a board of
+// mostly white arrows reads as one set, and only genuinely pale faces break away.
+function arrowInk(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return lum > 0.80 ? shade(hex, 0.42) : '#FFFFFF';
+}
 
 // Written out rather than using ctx.roundRect, which only reached Safari in
 // 16.4 — this game is judged on whatever phone is in a pocket. Traced onto
@@ -117,7 +132,8 @@ function arrow(ctx, cx, cy, size, color, dir) {
   ctx.restore();
 }
 
-// One tile: a dropped shadow, the thickness below the face, the face, the arrow.
+// One tile: a dropped shadow, the thickness below the face, the face in the
+// picture's colour, and the arrow on top.
 // Deliberately not ctx.shadowBlur — a blurred shadow per tile per frame is the
 // kind of thing that quietly costs frames on a mid-range phone, and at this size
 // an offset silhouette is indistinguishable.
@@ -136,13 +152,13 @@ export function drawTile(ctx, x, y, cell, color, dir, alpha = 1) {
 
   ctx.globalAlpha = alpha;
   roundRect(ctx, left, top + GEO.depth * cell, w, w, r);
-  ctx.fillStyle = TILE.edge;
+  ctx.fillStyle = shade(color, 0.74);
   ctx.fill();
 
   roundRect(ctx, left, top, w, w, r);
-  ctx.fillStyle = TILE.face;
+  ctx.fillStyle = color;
   ctx.fill();
 
-  arrow(ctx, left + w / 2, top + w / 2, w, color, dir);
+  arrow(ctx, left + w / 2, top + w / 2, w, arrowInk(color), dir);
   ctx.restore();
 }

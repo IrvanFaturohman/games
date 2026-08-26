@@ -63,9 +63,16 @@ exit and bounce back, plus a dull thunk. Silence reads as a broken tap.
 
 A level is art and nothing else — an ASCII grid, one letter per colour, plus a
 palette and a seed. **Every filled cell is one tile carrying one arrow**; there
-is no cutting into multi-cell pieces, and the tile faces are all the same tan.
-The picture reads from its silhouette plus the arrow colours, which is how the
-game this is modelled on does it. Eyes are cells painted `ink`.
+is no cutting into multi-cell pieces. **The tile face is the picture's colour** —
+the board is the animal, full colour — and the arrow on it stays neutral so it
+never competes with the drawing. Eyes are cells painted `ink`.
+
+Both the tile's thickness and its arrow are derived from its own face colour, so
+adding a colour to the palette needs nothing else: the thickness is a 0.74 shade
+of the face, and the arrow is white unless the face is paler than 0.80 luminance,
+in which case it becomes a deep tint of the face. That threshold sits high on
+purpose — a board of mostly white arrows reads as one set, and only genuinely
+pale faces like a cream muzzle break away.
 
 ```js
 { name: 'kucing', art: ['.P...P.', ...], palette: { P: PIECE.pink, ... }, seed: 7 }
