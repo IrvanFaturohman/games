@@ -199,10 +199,41 @@ The ~0.25 s eased slide is state advanced in `update(dt)` at a fixed 1/60 s (15
 steps), not a `performance.now()` read inside `render`. `render` only draws what
 `update` decided; `alpha` is there if a slide needs interpolating between steps.
 
-## Feel details worth the effort
+## The juice, and why each piece of it is there
 
-Slide eased out over ~0.25s · a piece fades as it crosses the board edge ·
-remaining-piece counter · subtle celebratory sweep when the board empties.
+All of it lives in `poseOf()` in `game.js`, which is the single place that decides
+where a tile is and how deformed. Timers advance in `update`; nothing here reads
+a clock during render.
+
+- **Press on `onDown`, not on release.** The face sinks onto its own thickness
+  and its shadow tightens. This is the one that matters most — a tile that does
+  not answer the finger until it has already decided to move feels dead.
+- **Anticipation before the slide.** The tile loads up 0.16 cells *against* its
+  arrow for 70 ms before it goes. Without it, leaving reads as a teleport.
+- **Stretch along the travel axis**, peaking mid-flight, so a tile smears the way
+  a thrown object does rather than sliding as a rigid square.
+- **The blocker answers too.** A refused move shakes the tile twice toward its
+  exit *and* pulses whatever stopped it. Refusing without pointing at the cause
+  teaches nothing, and this game has no other way to explain itself.
+- **Pitch climbs as the board empties** — `place` is played at up to 1.55× rate.
+  Thirty taps of the same note is a chore; thirty rising ones is a build.
+- **Tiles arrive from the middle outwards**, staggered by distance from centre,
+  so the animal assembles itself instead of appearing.
+- **The counter kicks** when a tile leaves. The one number that changes should be
+  the one thing that moves.
+- **`navigator.vibrate` where it exists** — 10 ms on a move, 18 on a refusal, a
+  pattern on a clear. Guarded; desktop and iOS Safari simply skip it.
+- **The silhouette breathes in the accent colour** on a clear, then the next
+  animal arrives. It is what the level was, so it gets the last beat.
+
+Screen shake is deliberately tiny and only fires on a refusal. There is no fail
+state here, so shake has nothing else to mean.
+
+## Progress dots
+
+Directly under the board, one per level in `LEVELS`, current in accent. `layout`
+reserves 104px at the bottom for them — if that shrinks, the dots collide with
+the board on a short viewport.
 
 ## Assets
 

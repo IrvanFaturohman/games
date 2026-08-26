@@ -83,7 +83,8 @@ export function roundRect(ctx, x, y, w, h, r) {
 // Drawn as one shape: a corner is rounded only where both cells that would touch
 // it are absent, so cells inside the blob butt together square and the union
 // reads as a single outline rather than a grid of squares.
-export function drawGhost(ctx, cells, ox, oy, cell) {
+export function drawGhost(ctx, cells, ox, oy, cell, opts = {}) {
+  const { color = COLOR.line, alpha = 0.5, scale = 1 } = opts;
   const set = new Set(cells.map(([x, y]) => x + ',' + y));
   const has = (x, y) => set.has(x + ',' + y);
   const r = GEO.radius * cell;
@@ -97,8 +98,18 @@ export function drawGhost(ctx, cells, ox, oy, cell) {
     ]);
   }
   ctx.save();
-  ctx.fillStyle = COLOR.line;
-  ctx.globalAlpha = 0.5;
+  if (scale !== 1) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [x, y] of cells) {
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x + 1);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y + 1);
+    }
+    const cx = ox + ((minX + maxX) / 2) * cell;
+    const cy = oy + ((minY + maxY) / 2) * cell;
+    ctx.translate(cx, cy); ctx.scale(scale, scale); ctx.translate(-cx, -cy);
+  }
+  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha;
   ctx.fill(path);
   ctx.restore();
 }
@@ -134,31 +145,50 @@ function arrow(ctx, cx, cy, size, color, dir) {
 
 // One tile: a dropped shadow, the thickness below the face, the face in the
 // picture's colour, and the arrow on top.
+//
 // Deliberately not ctx.shadowBlur — a blurred shadow per tile per frame is the
 // kind of thing that quietly costs frames on a mid-range phone, and at this size
 // an offset silhouette is indistinguishable.
-export function drawTile(ctx, x, y, cell, color, dir, alpha = 1) {
+//
+// `press` sinks the face onto its own thickness, which is what makes a tile feel
+// like a key rather than a picture of one. `stretch` runs along the travel axis,
+// so a tile leaving the board smears the way a thrown object does.
+export function drawTile(ctx, x, y, cell, color, dir, opts = {}) {
+  const { alpha = 1, press = 0, scale = 1, stretch = 1 } = opts;
+  if (alpha <= 0 || scale <= 0) return;
+
   const inset = GEO.inset * cell;
   const w = cell - inset * 2;
   const r = GEO.radius * cell;
   const left = x + inset, top = y + inset;
+  const depth = GEO.depth * cell;
+  const sink = press * depth;
+  const along = dir === 'left' || dir === 'right';
 
   ctx.save();
+  if (scale !== 1 || stretch !== 1) {
+    const cx = x + cell / 2, cy = y + cell / 2;
+    ctx.translate(cx, cy);
+    ctx.scale(scale * (along ? stretch : 1), scale * (along ? 1 : stretch));
+    ctx.translate(-cx, -cy);
+  }
 
-  ctx.globalAlpha = alpha * GEO.shadowAlpha;
-  roundRect(ctx, left, top + GEO.shadowOffset * cell, w, w, r);
+  // The shadow tightens as the tile is pushed down — that, more than the travel
+  // itself, is what sells the press.
+  ctx.globalAlpha = alpha * GEO.shadowAlpha * (1 - press * 0.65);
+  roundRect(ctx, left, top + GEO.shadowOffset * cell - sink * 0.5, w, w, r);
   ctx.fillStyle = COLOR.base;
   ctx.fill();
 
   ctx.globalAlpha = alpha;
-  roundRect(ctx, left, top + GEO.depth * cell, w, w, r);
+  roundRect(ctx, left, top + depth, w, w, r);
   ctx.fillStyle = shade(color, 0.74);
   ctx.fill();
 
-  roundRect(ctx, left, top, w, w, r);
+  roundRect(ctx, left, top + sink, w, w, r);
   ctx.fillStyle = color;
   ctx.fill();
 
-  arrow(ctx, left + w / 2, top + w / 2, w, arrowInk(color), dir);
+  arrow(ctx, left + w / 2, top + sink + w / 2, w, arrowInk(color), dir);
   ctx.restore();
 }
