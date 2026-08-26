@@ -303,12 +303,24 @@ the select screen is the spine of the game now, not a menu you pass through once
 
 ## Screen furniture
 
-**Pills, not labels**, and cards built the same way as tiles: a thickness under a
-face.
+Everything centred and evenly spaced reads as a template, so the UI carries a
+little hierarchy of its own:
+
+- **`meter()` is the one progress shape in the game** — the select header and the
+  in-level bar both use it, so they cannot drift apart. In a level it fills as
+  the picture appears; a bare countdown means nothing without remembering what it
+  started at.
+- **Cards get a numbered badge in the level's own dominant colour** (`LEVEL_HUE`,
+  counted once at load). The number is what makes the screen a level list rather
+  than a gallery, and the colour stops eighteen white cards reading alike.
+- **A locked card trades the number for a padlock in the same corner**, white on
+  a grey disc, exactly as the number is white on a coloured one. An earlier
+  version put a large dark padlock across the middle of the thumbnail — it hid
+  the picture, which is the thing that makes anyone want the level.
+- **Cards sink when pressed**, the same thickness-under-a-face language as a tile.
 
 A coloured wash panel behind the board was tried and removed — the user did not
-want a background behind the tiles. The page stays flat cream. If the board ever
-needs grounding again, it should not be a tinted slab.
+want a background behind the tiles. The page stays flat cream.
 
 ## Assets
 

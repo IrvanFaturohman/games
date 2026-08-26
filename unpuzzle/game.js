@@ -28,6 +28,20 @@ let screen  = 'select';   // 'select' | 'play'
 let cleared = [];         // level indices finished, persisted
 let cards   = [];         // hit-test rects for the select grid
 let scrollY = 0, scrollMax = 0, dragFrom = 0;
+let pressedCard = -1;
+
+// Each level's own dominant colour, for the number badge on its card. Counted
+// once at load — the art never changes at runtime.
+const LEVEL_HUE = LEVELS.map((lv) => {
+  const count = new Map();
+  for (const row of lv.art) {
+    for (const ch of row) {
+      if (ch === '.') continue;
+      count.set(ch, (count.get(ch) ?? 0) + 1);
+    }
+  }
+  return lv.palette[[...count].sort((a, b) => b[1] - a[1])[0][0]];
+});
 let enter   = 0;          // the select screen's entrance
 
 let level  = 0;
@@ -246,10 +260,10 @@ function tileAt(px, py) {
 const unlocked = (i) => i === 0 || cleared.includes(i - 1);
 
 function layoutSelect(stage) {
-  const padX = 22, gap = 14, cols = 2;
+  const padX = 20, gap = 13, cols = 2;
   const w = (stage.w - padX * 2 - gap * (cols - 1)) / cols;
-  const h = w * 1.16;
-  const top = 178;
+  const h = w * 1.12;
+  const top = 168;
 
   cards = LEVELS.map((lv, i) => ({
     i,
@@ -289,17 +303,19 @@ function finishLevel(game) {
   toSelect(game);
 }
 
+function cardAt(px, py) {
+  const y = py + scrollY;
+  return cards.find((card) =>
+    px >= card.x && px <= card.x + card.w && y >= card.y && y <= card.y + card.h) ?? null;
+}
+
 function pickCard(p, game) {
-  const y = p.y + scrollY;
-  for (const card of cards) {
-    if (p.x < card.x || p.x > card.x + card.w) continue;
-    if (y < card.y || y > card.y + card.h) continue;
-    if (!unlocked(card.i)) { game.audio.play('tap', { rate: 0.4 }); buzz(18); return; }
-    game.audio.play('place');
-    buzz(10);
-    startLevel(card.i, game.stage);
-    return;
-  }
+  const card = cardAt(p.x, p.y);
+  if (!card) return;
+  if (!unlocked(card.i)) { game.audio.play('tap', { rate: 0.4 }); buzz(18); return; }
+  game.audio.play('place');
+  buzz(10);
+  startLevel(card.i, game.stage);
 }
 
 // -------------------------------------------------------------------- layout
@@ -307,7 +323,7 @@ function pickCard(p, game) {
 // onResize never fires for the initial size, so this is called once from ready
 // and again on every change. The URL bar sliding away on iOS is a change.
 function layout(stage) {
-  const padX = 22, top = 156, bottom = 82;
+  const padX = 22, top = 142, bottom = 78;
   const availW = stage.w - padX * 2;
   const availH = stage.h - top - bottom;
   const cell = Math.floor(Math.min(availW / board.cols, availH / board.rows));
@@ -573,26 +589,19 @@ function drawOne(c, t) {
   drawTile(c, ox + p.x + t.x * cell, oy + p.y + t.y * cell, cell, t.color, t.dir, p);
 }
 
-function pill(c, text, cx, cy, bg, fg) {
-  c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
-  const w = c.measureText(text).width + 30;
-  roundRect(c, cx - w / 2, cy - 16, w, 32, 16);
-  c.fillStyle = bg;
+// One shape for every progress readout in the game, so the select header and
+// the in-level bar cannot drift apart.
+function meter(c, x, y, w, h, t, color) {
+  roundRect(c, x, y, w, h, h / 2);
+  c.fillStyle = COLOR.line;
   c.fill();
-  c.fillStyle = fg;
-  c.textAlign = 'center';
-  c.textBaseline = 'middle';
-  c.fillText(text, cx, cy);
-  return w;
+  if (t > 0) {
+    roundRect(c, x, y, Math.max(h, w * Math.min(1, t)), h, h / 2);
+    c.fillStyle = color;
+    c.fill();
+  }
 }
 
-const pillWidth = (c, text) => {
-  c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
-  return c.measureText(text).width + 30;
-};
-
-// A miniature of the level's own art. The card is the puzzle, shrunk — nothing
-// to author and no thumbnail to keep in sync with the drawing.
 function drawThumb(c, lv, x, y, w, h, muted) {
   const cols = lv.art[0].length, rows = lv.art.length;
   const cell = Math.min(w / cols, h / rows);
@@ -610,16 +619,19 @@ function drawThumb(c, lv, x, y, w, h, muted) {
 
 // Small on purpose: it marks the card, it does not replace the thumbnail. The
 // picture is the reason to want the level.
-function drawLock(c, cx, cy, r) {
+// Sized to sit inside its badge, and drawn in the badge's foreground colour so
+// it reads the same way the level number does — a mark on a disc, not a sticker
+// stuck over one.
+function drawLock(c, cx, cy, r, color = COLOR.baseSoft) {
   c.save();
-  c.strokeStyle = COLOR.baseSoft;
-  c.lineWidth = r * 0.34;
+  c.strokeStyle = color;
+  c.lineWidth = r * 0.30;
   c.lineCap = 'round';
   c.beginPath();
-  c.arc(cx, cy - r * 0.35, r * 0.52, Math.PI, 0);
+  c.arc(cx, cy - r * 0.34, r * 0.40, Math.PI, 0);
   c.stroke();
-  c.fillStyle = COLOR.baseSoft;
-  roundRect(c, cx - r * 0.8, cy - r * 0.25, r * 1.6, r * 1.25, r * 0.3);
+  c.fillStyle = color;
+  roundRect(c, cx - r * 0.58, cy - r * 0.22, r * 1.16, r * 0.92, r * 0.22);
   c.fill();
   c.restore();
 }
@@ -643,38 +655,73 @@ function drawTick(c, cx, cy, r) {
 }
 
 function drawCard(c, card) {
-  const k = easeOutBack(clamp01((enter - card.i * 0.10) * 2.4));
+  const k = easeOutBack(clamp01((enter - card.i * 0.075) * 2.4));
   if (k <= 0) return;
 
   const lv = LEVELS[card.i];
   const open = unlocked(card.i);
   const done = cleared.includes(card.i);
-  const r = card.w * 0.16;
-  const depth = card.w * 0.045;
+  const r = card.w * 0.17;
+  const depth = card.w * 0.05;
   const cx = card.x + card.w / 2, cy = card.y + card.h / 2;
+  const sink = card.i === pressedCard ? depth : 0;
 
   c.save();
   c.translate(cx, cy); c.scale(k, k); c.translate(-cx, -cy);
   c.globalAlpha = Math.min(1, k * 2);
 
-  // Same language as a tile: a thickness under a face.
+  // Same language as a tile: a thickness under a face, sinking when pressed.
   roundRect(c, card.x, card.y + depth, card.w, card.h, r);
-  c.fillStyle = open ? '#E4DDCC' : '#E9E5DB';
+  c.fillStyle = open ? '#E3DAC6' : '#E7E3D9';
   c.fill();
-  roundRect(c, card.x, card.y, card.w, card.h, r);
-  c.fillStyle = open ? COLOR.white : '#F1EDE4';
+  roundRect(c, card.x, card.y + sink, card.w, card.h, r);
+  c.fillStyle = open ? COLOR.white : '#F1EEE6';
   c.fill();
 
-  drawThumb(c, lv, card.x, card.y + card.h * 0.07, card.w, card.h * 0.60, !open);
+  const top = card.y + sink;
+  drawThumb(c, lv, card.x + card.w * 0.09, top + card.h * 0.14,
+    card.w * 0.82, card.h * 0.54, !open);
 
   c.textAlign = 'center';
   c.textBaseline = 'alphabetic';
   c.fillStyle = open ? COLOR.base : COLOR.line;
   c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
-  c.fillText(lv.name.toUpperCase(), cx, card.y + card.h * 0.86);
+  c.fillText(lv.name.toUpperCase(), cx, top + card.h * 0.88);
 
-  if (!open) drawLock(c, cx, card.y + card.h * 0.34, card.w * 0.095);
-  else if (done) drawTick(c, card.x + card.w - 20, card.y + 20, 10);
+  // The number is what makes this a level list rather than a gallery, and it
+  // carries the level's own colour so no two cards read alike. A locked card
+  // trades it for a padlock in the same corner — small, so it marks the card
+  // instead of hiding the picture that sells it.
+  const br = card.w * 0.115;
+  const bx = card.x + br + card.w * 0.055;
+  const by = top + br + card.w * 0.055;
+
+  if (open) {
+    c.beginPath();
+    c.arc(bx, by, br, 0, Math.PI * 2);
+    c.fillStyle = LEVEL_HUE[card.i];
+    c.fill();
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillStyle = COLOR.white;
+    c.font = `${TYPE.label.weight} ${Math.round(br * 1.05)}px ${TYPE.family}`;
+    c.fillText(String(card.i + 1), bx, by + br * 0.04);
+
+    if (done) {
+      const tx = card.x + card.w - br - card.w * 0.055;
+      c.beginPath();
+      c.arc(tx, by, br, 0, Math.PI * 2);
+      c.fillStyle = ACC;
+      c.fill();
+      drawTick(c, tx, by, br);
+    }
+  } else {
+    c.beginPath();
+    c.arc(bx, by, br, 0, Math.PI * 2);
+    c.fillStyle = COLOR.baseSoft;
+    c.fill();
+    drawLock(c, bx, by, br * 0.82, COLOR.white);
+  }
 
   c.restore();
 }
@@ -687,17 +734,24 @@ function renderSelect(c, stage) {
   c.textBaseline = 'alphabetic';
   c.fillStyle = COLOR.base;
   c.font = `${TYPE.title.weight} ${TYPE.title.size}px ${TYPE.family}`;
-  c.fillText('UNPUZZLE', stage.w / 2, 100);
+  c.fillText('UNPUZZLE', stage.w / 2, 84);
 
+  // A bar says how far along you are at a glance; the sentence it replaced had
+  // to be read first.
+  const bw = Math.min(190, stage.w - 160);
+  const bx = (stage.w - bw) / 2 - 14;
+  meter(c, bx, 104, bw, 9, cleared.length / LEVELS.length, ACC);
+
+  c.textAlign = 'left';
+  c.textBaseline = 'middle';
   c.fillStyle = COLOR.baseSoft;
   c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
-  c.fillText(`${cleared.length} DARI ${LEVELS.length} SELESAI`, stage.w / 2, 132);
+  c.fillText(`${cleared.length}/${LEVELS.length}`, bx + bw + 12, 109);
 
   for (const card of cards) drawCard(c, card);
   c.restore();
 }
 
-// Generous hit radius: the drawn circle is smaller than what the thumb gets.
 const BACK = { x: 42, y: 58, r: 30 };
 
 function drawBack(c) {
@@ -717,27 +771,32 @@ function drawBack(c) {
 
 function drawHud(c, stage) {
   const left = board.tiles.filter((t) => !t.gone).length;
-  const y = 58;
-  const rest = `SISA ${left}`;
 
   drawBack(c);
-  c.save();
 
-  // The counter kicks on every tile that leaves — the one number that changes
-  // should be the one thing that moves.
-  const rw = pillWidth(c, rest);
   c.save();
-  c.translate(stage.w - 22 - rw / 2, y);
-  c.scale(1 + punch * 0.22, 1 + punch * 0.22);
-  pill(c, rest, 0, 0, left ? COLOR.base : ACC, COLOR.white);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillStyle = COLOR.base;
+  c.font = `${TYPE.title.weight} 25px ${TYPE.family}`;
+  c.fillText(board.name.toUpperCase(), stage.w / 2, 58);
   c.restore();
 
-  // The animal's name is the title of the screen, not a third equal label.
-  c.textAlign = 'center';
-  c.textBaseline = 'alphabetic';
-  c.fillStyle = COLOR.base;
-  c.font = `${TYPE.title.weight} 27px ${TYPE.family}`;
-  c.fillText(board.name.toUpperCase(), stage.w / 2, y + 62);
+  // A bar that fills as the picture appears. A bare countdown means nothing
+  // without remembering what it started at.
+  const numW = 48;
+  meter(c, 24, 96, stage.w - 48 - numW, 10, 1 - left / board.total, ACC);
+
+  // The counter still kicks on every tile that leaves — the one number that
+  // changes should be the one thing that moves.
+  c.save();
+  c.textAlign = 'right';
+  c.textBaseline = 'middle';
+  c.fillStyle = left ? COLOR.baseSoft : ACC;
+  c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
+  c.translate(stage.w - 24, 101);
+  c.scale(1 + punch * 0.3, 1 + punch * 0.3);
+  c.fillText(String(left), 0, 0);
   c.restore();
 }
 
@@ -774,7 +833,12 @@ boot({
     // Press down on touch, not on release — the tile has to answer the finger
     // before anything else happens.
     onDown(p) {
-      if (screen !== 'play') { dragFrom = scrollY + p.y; return; }
+      if (screen !== 'play') {
+        dragFrom = scrollY + p.y;
+        const card = cardAt(p.x, p.y);
+        pressedCard = card && unlocked(card.i) ? card.i : -1;
+        return;
+      }
       held = tileAt(p.x, p.y);
       panLast = { x: p.x, y: p.y };
       pinch = null;
@@ -784,6 +848,7 @@ boot({
       if (screen !== 'play') {
         // Drag scrolls the grid; input.js already withholds onTap once the
         // finger drifts past its slop, so the two gestures cannot both fire.
+        if (p.moved) pressedCard = -1;
         if (scrollMax > 0) scrollY = Math.min(scrollMax, Math.max(0, dragFrom - p.y));
         return;
       }
@@ -830,6 +895,7 @@ boot({
     onUp(p, pointers) {
       held = null;
       panLast = null;
+      pressedCard = -1;
       if (pointers.size < 2) pinch = null;
     },
   },
