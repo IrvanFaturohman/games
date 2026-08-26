@@ -17,7 +17,7 @@ const FALL_TIME    = 0.32;  // stick swinging down
 const WALK_SPEED   = 175;
 const CAM_TIME     = 0.40;
 const PERFECT_MAX  = 7;     // half-width of the double-score zone, on a wide platform
-const RAMP_OVER    = 26;    // points from opening difficulty to full
+const RAMP_OVER    = 20;    // points from opening difficulty to full
 const SCENE_EVERY  = 5;
 const SCENE_FADE   = 0.9;
 
@@ -42,7 +42,9 @@ const S = {
 
 const platform = (i) => S.platforms[i];
 const rightEdge = (p) => p.x + p.w;
-const standX = (p) => rightEdge(p) - 20;
+// Hero stands 20px in from the right edge, but never past the middle — on a
+// narrow platform a fixed inset would place it off the left side entirely.
+const standX = (p) => rightEdge(p) - Math.min(20, p.w / 2);
 const maxReach = (stage) => stage.w - layout(stage).pivotX - 24;
 
 // Difficulty has to actually ramp — flat random geometry reads as easy forever
@@ -54,7 +56,7 @@ function addPlatform(stage) {
   const opening = S.platforms.length <= 3;   // first few near-impossible to fail
   const d = opening ? 0 : difficulty();
 
-  const w = rand(lerp(96, 26, d), lerp(122, 46, d));
+  const w = rand(lerp(96, 16, d), lerp(122, 32, d));
   const gapMin = opening ? 44 : lerp(52, 100, d);
   // Never generate a gap the player cannot span before the stick runs off screen.
   const gapMax = Math.max(gapMin + 12,

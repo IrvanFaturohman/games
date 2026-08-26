@@ -105,9 +105,12 @@ the hero walks off the end and falls. Score = platforms crossed.
   brief scale punch). This single reward is what makes people replay.
 - **Difficulty must ramp, not just vary.** Flat random geometry reads as easy
   forever however wide the spread — that was the first version's mistake.
-  `difficulty()` runs 0 → 1 over `RAMP_OVER` points; platforms narrow (~96 → ~26
+  `difficulty()` runs 0 → 1 over `RAMP_OVER` points; platforms narrow (~96 → ~16
   px) and gaps stretch (~50 → ~250 px) together. Gaps are still clamped against
   `maxReach()` so an unreachable one cannot be generated.
+- **`standX()` is clamped to the platform midpoint.** A fixed inset from the
+  right edge puts the hero off the left side entirely once platforms get
+  narrower than twice that inset — which they now do.
 - **The perfect zone scales with the platform** (`w * 0.13`, capped at
   `PERFECT_MAX`). A fixed zone would make perfects *more* common as platforms
   narrow — exactly backwards.
