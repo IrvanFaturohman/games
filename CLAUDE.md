@@ -56,6 +56,21 @@ Designed in Figma, one file per game, exported into `<game>/assets/`.
 Prefer SVG for flat shapes; PNG @2x only when a shape cannot be vector.
 Generate what canvas cannot draw cheaply — do not export a rectangle.
 
+Load them with `loadAll()` from `shared/assets.js`. SVG draws to canvas like any
+other image and stays crisp at every DPR, so there are no @2x/@3x variants.
+
+**Export trap.** Calling `download_assets` with `defaultFormat` *overrides* the
+node's own export settings and re-adds a `#F5F5F5` backing rectangle to the SVG.
+Set `exportSettings` on the node once (`[{format:'SVG', suffix:''}]`, which
+carries `contentsOnly: true`) and then call `download_assets` **without**
+`defaultFormat` so those settings win.
+
+Every fill in Figma is bound to a `tokens` variable, never a raw hex — that is
+what keeps the three files from drifting apart. Each file has its own `tokens`
+collection: 16 variables (`color/*`, `space/*`, `stroke/*`, `radius/*`) and four
+text styles (Score, Title, Body, Label) on Baloo 2. Note Figma spells the styles
+`ExtraBold` and `SemiBold` with no space — unlike Inter.
+
 Figma files:
 - stick-hero `3MCjOe4tnvd5wTM4tPtE4Y`
 - tangram/polygram `L5n7rj9XmQnAOxG9s0Tdpg`
