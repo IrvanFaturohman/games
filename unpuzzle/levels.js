@@ -1,11 +1,9 @@
-// Levels are pictures. Nothing else is authored — `carve.js` cuts the silhouette
-// into pieces and works out every exit direction at load, so there is no piece
-// table or exit table to keep in sync with the art.
+// Levels are pictures. One letter per colour, '.' for empty, and every filled
+// cell becomes one tile carrying one arrow. `carve.js` works out which way each
+// arrow points at load, so nothing but the drawing is authored here.
 //
-// One letter per colour, '.' for empty. Draw the animal, pick a palette, mark
-// where the eyes go, and that is the whole level. Eyes are painted on rather
-// than being pieces: pieces only ever leave, so a piece fully enclosed by
-// another could never get out and would deadlock the board.
+// The picture reads from its silhouette plus the arrow colours — the tile faces
+// are all the same tan, as in the reference. Eyes are just cells painted `ink`.
 //
 // After editing, check every level still carves:  node unpuzzle/tools/author.mjs
 
@@ -13,54 +11,46 @@ import { PIECE } from './style.js';
 
 export const LEVELS = [
   {
-    name: 'anak ayam',
+    name: 'ikan',
     art: [
-      '....R....',
-      '...RRR...',
-      '..YYYYY..',
-      '.YYYYYYY.',
-      'OYYYYYYY.',
-      '.YYYYYYY.',
-      '.YYYYYYY.',
-      '..YYYYY..',
-      '..O...O..',
+      '..SSS...V',
+      '.SSSSSSVV',
+      'CSESSSSVV',
+      '.SSSSSSVV',
+      '..SSS...V',
     ],
-    palette: { R: PIECE.coral, Y: PIECE.amber, O: PIECE.orange },
-    eyes: [[3, 3], [5, 3]],
-    seed: 11,
+    palette: { S: PIECE.sky, V: PIECE.violet, C: PIECE.coral, E: PIECE.ink },
+    seed: 23,
   },
 
   {
-    name: 'ikan',
+    name: 'anak ayam',
     art: [
-      '........VV.',
-      '..SSSSS.VV.',
-      '.SSSSSSSVV.',
-      'CSSSSSSSVVV',
-      '.SSSSSSSVV.',
-      '..SSSSS.VV.',
-      '........VV.',
+      '...R....',
+      '..RRR...',
+      '..YYYY..',
+      'OYEYYYY.',
+      '.YYYYYY.',
+      '.YYYYYY.',
+      '..YYYY..',
+      '..O..O..',
     ],
-    palette: { S: PIECE.sky, V: PIECE.violet, C: PIECE.coral },
-    eyes: [[2, 3]],
-    seed: 23,
+    palette: { R: PIECE.coral, Y: PIECE.amber, O: PIECE.orange, E: PIECE.ink },
+    seed: 11,
   },
 
   {
     name: 'kucing',
     art: [
-      '.PP...PP.',
-      '.OOOOOOO.',
-      'OOOOOOOOO',
-      'OOOOOOOOO',
-      '.OOOOOOO.',
-      '..OOOOO..',
-      '.OOOOOOOT',
-      '.OOOOOOOT',
-      '.AA...AA.',
+      '.P...P.',
+      '.POOOP.',
+      'OOEOEOO',
+      'OOOOOOO',
+      '.OOOOO.',
+      '.OOOOOT',
+      '.A...A.',
     ],
-    palette: { P: PIECE.pink, O: PIECE.orange, T: PIECE.orange, A: PIECE.amber },
-    eyes: [[3, 2], [5, 2]],
+    palette: { P: PIECE.pink, O: PIECE.orange, T: PIECE.orange, A: PIECE.amber, E: PIECE.ink },
     seed: 7,
   },
 ];

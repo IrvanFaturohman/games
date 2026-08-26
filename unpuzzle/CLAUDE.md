@@ -62,38 +62,34 @@ exit and bounce back, plus a dull thunk. Silence reads as a broken tap.
 ## Levels are pictures
 
 A level is art and nothing else — an ASCII grid, one letter per colour, plus a
-palette, eye positions and a seed. `carve.js` cuts the silhouette into polyomino
-pieces and assigns every exit direction at load. There is no piece table and no
-exit table to keep in sync with the drawing.
+palette and a seed. **Every filled cell is one tile carrying one arrow**; there
+is no cutting into multi-cell pieces, and the tile faces are all the same tan.
+The picture reads from its silhouette plus the arrow colours, which is how the
+game this is modelled on does it. Eyes are cells painted `ink`.
 
 ```js
-{ name: 'kucing', art: ['.PP...PP.', ...], palette: { P: PIECE.pink, ... },
-  eyes: [[3, 2], [5, 2]], seed: 7 }
+{ name: 'kucing', art: ['.P...P.', ...], palette: { P: PIECE.pink, ... }, seed: 7 }
 ```
 
-Exits are **peeled, never guessed**: take a piece with a clear straight run to an
-edge given what is still on the board, assign it that direction, remove it,
-repeat. The peel order is by construction a solution, so a carve that returns at
-all is a level that can be finished. A cut that boxes a piece in is discarded and
-re-cut with the next seed.
+`carve.js` decides which way each arrow points at load, and it **peels rather
+than guesses**: take a tile with a clear straight run to an edge given what is
+still on the board, assign it that direction, remove it, repeat. The peel order
+is by construction a solution, so a level that resolves is a level that can be
+finished. It cannot get stuck either — the topmost remaining tile in any column
+always has a clear run upward.
 
-**No piece may be enclosed by another.** Pieces only ever leave, so an enclosed
-piece must wait for its ring — and every path the ring could take crosses the
-enclosed piece. That is a deadlock no exit assignment can repair, and it is why
-eyes are painted on rather than being pieces of their own. The carver detects it
-and re-cuts, but art that forces it will burn every try and throw.
-
-Check every level still carves after editing art:
+Check every level after editing art:
 
 ```
 node unpuzzle/tools/author.mjs
 ```
 
-It reports piece count, piece sizes, and **free-on-turn-1** — how many pieces can
-move immediately. That is the only real difficulty knob, since the ruleset cannot
-dead-end (below). Organic silhouettes have most of their pieces on the boundary,
-so this number runs high and levels play loose; tightening it means art with more
-interior.
+It prints the silhouette as blocks, which is the fastest way to catch art that
+does not read as the animal — a beak that does not protrude past the head, ears
+flush with the skull. It also reports **free-on-turn-1**, how many tiles can move
+immediately, which is the only real difficulty knob since the ruleset cannot
+dead-end (below). Solid silhouettes leave most tiles on the boundary, so that
+number runs high and levels play loose.
 
 ## Difficulty is search, not strategy
 

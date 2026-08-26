@@ -7,31 +7,33 @@
 
 import { COLOR, ACCENT } from '../shared/tokens.js';
 
-// Every value is a fraction of the cell, never a fixed pixel count, so a piece
+// Every value is a fraction of the cell, never a fixed pixel count, so a tile
 // reads the same on a 360px phone as on a tablet.
 export const GEO = {
-  radius:       0.18,
-  outline:      0.055,  // the die-cut white edge
-  inset:        0.05,   // pulls a piece off its cell bounds so neighbours separate
-  shadowOffset: 0.05,
-  shadowAlpha:  0.16,
-  plate:        0.14,   // board plate padding, in cells — layout must reserve it
-  plateRadius:  0.22,
+  radius:       0.20,
+  inset:        0.055,  // gap between neighbouring tiles
+  depth:        0.10,   // the tile's apparent thickness, below its face
+  shadowOffset: 0.13,
+  shadowAlpha:  0.13,
 };
 
-// Piece colours are game content, not suite tokens — stick-hero and polygram
-// have no pieces. These mirror the `color/piece-*` variables in this game's
+// The tile face is one colour for every tile, as in the reference — the picture
+// is carried by the silhouette and the arrow colours, not by the tiles.
+export const TILE = { face: '#F7E7C9', edge: '#DFC395' };
+
+// Arrow colours are game content, not suite tokens — stick-hero and polygram
+// have no tiles. These mirror the `color/piece-*` variables in this game's
 // Figma file; change both together or they drift.
 export const PIECE = {
   green:  ACCENT.unpuzzle,
-  coral:  '#FF6B6B',
-  amber:  '#FFC93C',
+  coral:  '#F0554B',
+  amber:  '#F2A73B',
   blue:   '#4D9DE0',
-  violet: '#A06CD5',
-  orange: '#FF9F45',
-  sky:    '#8ED2F5',
+  violet: '#B05BC4',
+  orange: '#E8762C',
+  sky:    '#6EC1E4',
   pink:   '#FF9BC2',
-  ink:    COLOR.base,
+  ink:    '#4A3B36',
 };
 
 // Written out rather than using ctx.roundRect, which only reached Safari in
@@ -59,73 +61,88 @@ export function roundRect(ctx, x, y, w, h, r) {
   trace(ctx, x, y, w, h, Array.isArray(r) ? r : [r, r, r, r]);
 }
 
-// One sticker, not a pile of tiles.
+// The animal's full footprint, faint, under everything. Tiles cover it exactly,
+// so it only shows where one has already left — and once the board is clear it
+// is the whole silhouette, which is what the player spent the level taking apart.
 //
-// A corner is rounded only where both cells that would touch it are absent, and
-// an edge is inset only where the piece has no neighbour of its own there. Cells
-// inside the piece therefore butt together at full size with square corners, so
-// the union fills seamlessly and only the outer boundary carries the shape.
-//
-// `grow` pushes that outer boundary outward without disturbing internal edges —
-// that is what draws the white edge and the shadow from the same footprint.
-function piecePath(cells, has, ox, oy, cell, grow) {
-  const inset = GEO.inset * cell;
-  const r = GEO.radius * cell + grow;
+// Drawn as one shape: a corner is rounded only where both cells that would touch
+// it are absent, so cells inside the blob butt together square and the union
+// reads as a single outline rather than a grid of squares.
+export function drawGhost(ctx, cells, ox, oy, cell) {
+  const set = new Set(cells.map(([x, y]) => x + ',' + y));
+  const has = (x, y) => set.has(x + ',' + y);
+  const r = GEO.radius * cell;
   const path = new Path2D();
   for (const [cx, cy] of cells) {
     const L = has(cx - 1, cy), R = has(cx + 1, cy);
     const U = has(cx, cy - 1), D = has(cx, cy + 1);
-    const l = L ? 0 : inset - grow, r0 = R ? 0 : inset - grow;
-    const t = U ? 0 : inset - grow, b = D ? 0 : inset - grow;
-    trace(path,
-      ox + cx * cell + l, oy + cy * cell + t,
-      cell - l - r0, cell - t - b,
-      [(!L && !U) ? r : 0, (!R && !U) ? r : 0,
-       (!R && !D) ? r : 0, (!L && !D) ? r : 0]);
+    trace(path, ox + cx * cell, oy + cy * cell, cell, cell, [
+      (!L && !U) ? r : 0, (!R && !U) ? r : 0,
+      (!R && !D) ? r : 0, (!L && !D) ? r : 0,
+    ]);
   }
-  return path;
-}
-
-// The animal's full footprint, faint, under everything. Pieces cover it exactly,
-// so it only shows where one has already left — and once the board is clear it
-// is the whole silhouette, which is what the player spent the level taking apart.
-export function drawGhost(ctx, cells, ox, oy, cell) {
-  const set = new Set(cells.map(([x, y]) => x + ',' + y));
-  const has = (x, y) => set.has(x + ',' + y);
   ctx.save();
   ctx.fillStyle = COLOR.line;
-  ctx.globalAlpha = 0.55;
-  ctx.fill(piecePath(cells, has, ox, oy, cell, 0));
+  ctx.globalAlpha = 0.5;
+  ctx.fill(path);
   ctx.restore();
 }
 
-// Three fills of the same footprint: offset silhouette, white edge, body.
-// Deliberately not ctx.shadowBlur — a blurred shadow per piece per frame is the
-// kind of thing that quietly costs frames on a mid-range phone, and at this size
-// the offset version is indistinguishable.
-export function drawPiece(ctx, cells, has, ox, oy, cell, colorAt, alpha = 1) {
-  const edge = GEO.outline * cell;
-  const outer = piecePath(cells, has, ox, oy, cell, edge);
-  const body  = piecePath(cells, has, ox, oy, cell, 0);
+// The shape points up at zero rotation, so this is how far to turn it.
+const TURN = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
 
+// A blocky arrow — shaft plus head — stroked in its own colour with round joins,
+// which is what softens the corners without a second path.
+function arrow(ctx, cx, cy, size, color, dir) {
+  const s = size * 0.30;
   ctx.save();
-  ctx.globalAlpha = alpha * GEO.shadowAlpha;
-  ctx.translate(0, GEO.shadowOffset * cell);
-  ctx.fillStyle = COLOR.base;
-  ctx.fill(outer);
+  ctx.translate(cx, cy);
+  ctx.rotate(TURN[dir]);
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.10);
+  ctx.lineTo(s * 1.00, -s * 0.05);
+  ctx.lineTo(s * 0.44, -s * 0.05);
+  ctx.lineTo(s * 0.44, s * 0.95);
+  ctx.lineTo(-s * 0.44, s * 0.95);
+  ctx.lineTo(-s * 0.44, -s * 0.05);
+  ctx.lineTo(-s * 1.00, -s * 0.05);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size * 0.11;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.fill();
   ctx.restore();
+}
+
+// One tile: a dropped shadow, the thickness below the face, the face, the arrow.
+// Deliberately not ctx.shadowBlur — a blurred shadow per tile per frame is the
+// kind of thing that quietly costs frames on a mid-range phone, and at this size
+// an offset silhouette is indistinguishable.
+export function drawTile(ctx, x, y, cell, color, dir, alpha = 1) {
+  const inset = GEO.inset * cell;
+  const w = cell - inset * 2;
+  const r = GEO.radius * cell;
+  const left = x + inset, top = y + inset;
 
   ctx.save();
+
+  ctx.globalAlpha = alpha * GEO.shadowAlpha;
+  roundRect(ctx, left, top + GEO.shadowOffset * cell, w, w, r);
+  ctx.fillStyle = COLOR.base;
+  ctx.fill();
+
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = COLOR.white;
-  ctx.fill(outer);
-  // The picture rides the piece: every cell keeps its own colour from the art,
-  // clipped to the piece outline so the sticker edge stays one clean shape and
-  // a single piece can carry more than one colour.
-  ctx.clip(body);
-  for (const [cx, cy] of cells) {
-    ctx.fillStyle = colorAt(cx, cy);
-    ctx.fillRect(ox + cx * cell - 0.5, oy + cy * cell - 0.5, cell + 1, cell + 1);
-  }
+  roundRect(ctx, left, top + GEO.depth * cell, w, w, r);
+  ctx.fillStyle = TILE.edge;
+  ctx.fill();
+
+  roundRect(ctx, left, top, w, w, r);
+  ctx.fillStyle = TILE.face;
+  ctx.fill();
+
+  arrow(ctx, left + w / 2, top + w / 2, w, color, dir);
   ctx.restore();
 }
