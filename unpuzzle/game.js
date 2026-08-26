@@ -10,7 +10,7 @@ import { boot } from '../shared/boot.js';
 import { COLOR, TYPE, ACCENT } from '../shared/tokens.js';
 import { LEVELS } from './levels.js';
 import { carve } from './carve.js';
-import { drawTile, drawGhost } from './style.js';
+import { drawTile, drawGhost, roundRect, mix } from './style.js';
 
 const NAME = 'unpuzzle';
 const ACC = ACCENT[NAME];
@@ -32,6 +32,21 @@ let held   = null;   // the tile under the finger, for the press-down
 let shake  = 0;
 let punch  = 0;      // the counter's kick when a tile leaves
 
+// Capped hard: a mid-range phone will draw a few dozen small shapes a frame
+// without noticing and will absolutely notice a few hundred.
+const MAX_BITS = 130;
+const bits = [];
+
+function spark(x, y, color, opts = {}) {
+  if (bits.length >= MAX_BITS) return;
+  const { vx = 0, vy = 0, life = 0.5, size = 6, grav = 0, spin = 0 } = opts;
+  bits.push({ x, y, vx, vy, life, max: life, size, color, grav, rot: 0, spin });
+}
+
+// Deterministic spread — update has to stay reproducible, so the "randomness"
+// comes from the index rather than Math.random.
+const spread = (i, n) => (i / n) * Math.PI * 2 + (i % 3) * 0.7;
+
 // Phones that support it get a tick; the ones that do not carry on silently.
 const buzz = (ms) => { try { navigator.vibrate?.(ms); } catch { /* unsupported */ } };
 
@@ -48,6 +63,10 @@ function loadLevel(i) {
     rows: carved.rows,
     total: carved.tiles.length,
     ghost: carved.tiles.map((t) => [t.x, t.y]),
+    // The wash behind the board is this level's dominant colour, pulled most of
+    // the way back to the page — so each animal brings its own mood with it.
+    wash: mix(dominant(carved.tiles), COLOR.bg, 0.86),
+    palette: [...new Set(carved.tiles.map((t) => t.color))],
     tiles: carved.tiles.map((t) => ({
       x: t.x, y: t.y, color: t.color, dir: t.dir,
       gone: false, slide: null, bounce: 0, jiggle: 0, press: 0,
@@ -58,6 +77,12 @@ function loadLevel(i) {
   };
   clearT = -1;
   held = null;
+}
+
+function dominant(tiles) {
+  const count = new Map();
+  for (const t of tiles) count.set(t.color, (count.get(t.color) ?? 0) + 1);
+  return [...count].sort((a, b) => b[1] - a[1])[0][0];
 }
 
 // A tile that has committed to leaving no longer occupies the board, so taps can
@@ -94,6 +119,7 @@ function trySlide(t, audio) {
 
   if (result.clear) {
     t.slide = { t: 0, steps: result.steps, left: false };
+    puff(t);
     const remaining = board.tiles.filter((q) => !q.gone && !q.slide).length;
     // Pitch climbs as the board empties, so a long level builds instead of
     // repeating the same note thirty times.
@@ -102,9 +128,57 @@ function trySlide(t, audio) {
   } else {
     t.bounce = BOUNCE_DUR;
     result.blocker.jiggle = JIGGLE_DUR;
+    sparksAt(t, result.blocker);
     shake = Math.max(shake, 0.35);
     audio.play('tap', { rate: 0.4 });  // there is no `thunk` preset; rate is the only knob
     buzz(18);
+  }
+}
+
+// Dust where the tile was, not where it went — the eye is still at the origin
+// when the tap lands, and that is where the departure needs to register.
+function puff(t) {
+  const { ox, oy, cell } = view;
+  const cx = ox + (t.x + 0.5) * cell, cy = oy + (t.y + 0.5) * cell;
+  for (let i = 0; i < 7; i++) {
+    const a = spread(i, 7);
+    const speed = cell * (1.1 + (i % 4) * 0.35);
+    spark(cx, cy, t.color, {
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      life: 0.30 + (i % 3) * 0.09, size: cell * (0.10 + (i % 3) * 0.035),
+      grav: cell * 3.4, spin: (i % 2 ? 1 : -1) * 7,
+    });
+  }
+}
+
+// Sparks land on the seam between the two tiles, so the refusal has a location.
+function sparksAt(t, blocker) {
+  const { ox, oy, cell } = view;
+  const [dx, dy] = DIR[t.dir];
+  const cx = ox + (t.x + 0.5 + dx * 0.5) * cell;
+  const cy = oy + (t.y + 0.5 + dy * 0.5) * cell;
+  for (let i = 0; i < 5; i++) {
+    const a = spread(i, 5);
+    spark(cx, cy, blocker.color, {
+      vx: (Math.cos(a) - dx * 1.4) * cell * 1.5,
+      vy: (Math.sin(a) - dy * 1.4) * cell * 1.5,
+      life: 0.22 + (i % 2) * 0.07, size: cell * 0.075,
+      grav: cell * 5, spin: 9,
+    });
+  }
+}
+
+function confetti() {
+  const { ox, oy, cell } = view;
+  const cx = ox + (board.cols / 2) * cell, cy = oy + (board.rows / 2) * cell;
+  for (let i = 0; i < 34; i++) {
+    const a = spread(i, 34);
+    const speed = cell * (2.6 + (i % 5) * 0.7);
+    spark(cx, cy, board.palette[i % board.palette.length], {
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - cell * 1.6,
+      life: 0.9 + (i % 4) * 0.2, size: cell * (0.11 + (i % 3) * 0.04),
+      grav: cell * 6, spin: (i % 2 ? 1 : -1) * 11,
+    });
   }
 }
 
@@ -119,11 +193,17 @@ function tileAt(px, py) {
 
 // onResize never fires for the initial size, so this is called once from ready
 // and again on every change. The URL bar sliding away on iOS is a change.
+const WASH_PAD = 0.62;   // in cells, on every side of the board
+
 function layout(stage) {
-  const padX = 20, top = 110, bottom = 76;
+  const padX = 22, top = 156, bottom = 82;
+  const skirt = WASH_PAD * 2;                 // the wash sits outside the board
   const availW = stage.w - padX * 2;
   const availH = stage.h - top - bottom;
-  const cell = Math.floor(Math.min(availW / board.cols, availH / board.rows));
+  const cell = Math.floor(Math.min(
+    availW / (board.cols + skirt),
+    availH / (board.rows + skirt),
+  ));
   view = {
     cell,
     ox: Math.round((stage.w - cell * board.cols) / 2),
@@ -166,8 +246,19 @@ function update(dt, game) {
   shake = Math.max(0, shake - dt * 2.6);
   punch = Math.max(0, punch - dt * 3.4);
 
+  for (let i = bits.length - 1; i >= 0; i--) {
+    const b = bits[i];
+    b.life -= dt;
+    if (b.life <= 0) { bits.splice(i, 1); continue; }
+    b.vy += b.grav * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.rot += b.spin * dt;
+  }
+
   if (alive === 0 && clearT < 0) {
     clearT = 0;
+    confetti();
     game.audio.play('perfect');
     buzz([14, 60, 26]);
   }
@@ -179,6 +270,7 @@ function update(dt, game) {
       game.store.set('level', level);
       loadLevel(level);
       layout(game.stage);
+      bits.length = 0;
     }
   }
 }
@@ -197,12 +289,40 @@ function render(c, game) {
     c.translate(Math.sin(shake * 91) * shake * 7, Math.cos(shake * 67) * shake * 7);
   }
 
+  drawWash(c);
   drawBoardGhost(c);
   for (const t of board.tiles) drawOne(c, t);
+  drawBits(c);
   c.restore();
 
   drawHud(c, stage);
   if (clearT >= 0) drawClear(c, stage);
+}
+
+// A panel behind the board in the level's own colour. Without it the tiles float
+// in an empty page, which is the difference between a screen and a screenshot.
+function drawWash(c) {
+  const { ox, oy, cell } = view;
+  const pad = cell * WASH_PAD;
+  roundRect(c, ox - pad, oy - pad,
+    board.cols * cell + pad * 2, board.rows * cell + pad * 2, cell * 0.55);
+  c.fillStyle = board.wash;
+  c.fill();
+}
+
+function drawBits(c) {
+  for (const b of bits) {
+    const k = b.life / b.max;
+    const s = b.size * (0.45 + k * 0.55);
+    c.save();
+    c.globalAlpha = Math.min(1, k * 1.7);
+    c.translate(b.x, b.y);
+    c.rotate(b.rot);
+    c.fillStyle = b.color;
+    roundRect(c, -s / 2, -s / 2, s, s, s * 0.3);
+    c.fill();
+    c.restore();
+  }
 }
 
 function drawBoardGhost(c) {
@@ -269,29 +389,65 @@ function drawOne(c, t) {
   if (t.gone) return;
   const { ox, oy, cell } = view;
   const p = poseOf(t);
+
+  // Echoes strung out behind a moving tile. Three is enough to read as speed;
+  // more just costs fill rate for something on screen a quarter of a second.
+  if (t.slide && t.slide.t > SLIDE_WIND) {
+    for (let i = 3; i >= 1; i--) {
+      const f = 1 - i * 0.13;
+      drawTile(c, ox + p.x * f + t.x * cell, oy + p.y * f + t.y * cell, cell, t.color, t.dir, {
+        alpha: p.alpha * (0.22 - i * 0.05),
+        scale: p.scale * (1 - i * 0.05),
+        stretch: p.stretch,
+      });
+    }
+  }
+
   drawTile(c, ox + p.x + t.x * cell, oy + p.y + t.y * cell, cell, t.color, t.dir, p);
 }
 
+function pill(c, text, cx, cy, bg, fg) {
+  c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
+  const w = c.measureText(text).width + 30;
+  roundRect(c, cx - w / 2, cy - 16, w, 32, 16);
+  c.fillStyle = bg;
+  c.fill();
+  c.fillStyle = fg;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(text, cx, cy);
+  return w;
+}
+
+const pillWidth = (c, text) => {
+  c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
+  return c.measureText(text).width + 30;
+};
+
 function drawHud(c, stage) {
-  const x = 24, y = 74;
   const left = board.tiles.filter((t) => !t.gone).length;
+  const y = 58;
+  const lvl = `LEVEL ${level + 1}`;
+  const rest = `SISA ${left}`;
 
   c.save();
-  c.font = `${TYPE.label.weight} ${TYPE.label.size}px ${TYPE.family}`;
-  c.textAlign = 'left';
-  c.fillStyle = COLOR.baseSoft;
-  c.fillText(`LEVEL ${level + 1}`, x, y);
-
-  c.textAlign = 'center';
-  c.fillText(board.name.toUpperCase(), stage.w / 2, y);
+  pill(c, lvl, 22 + pillWidth(c, lvl) / 2, y, COLOR.white, COLOR.baseSoft);
 
   // The counter kicks on every tile that leaves — the one number that changes
   // should be the one thing that moves.
-  c.textAlign = 'right';
-  c.fillStyle = left ? COLOR.base : ACC;
-  c.translate(stage.w - x, y);
-  c.scale(1 + punch * 0.28, 1 + punch * 0.28);
-  c.fillText(`SISA ${left}`, 0, 0);
+  const rw = pillWidth(c, rest);
+  c.save();
+  c.translate(stage.w - 22 - rw / 2, y);
+  c.scale(1 + punch * 0.22, 1 + punch * 0.22);
+  pill(c, rest, 0, 0, left ? COLOR.base : ACC, COLOR.white);
+  c.restore();
+
+  // The animal's name is the title of the screen, not a third equal label.
+  c.textAlign = 'center';
+  c.textBaseline = 'alphabetic';
+  c.fillStyle = COLOR.base;
+  c.font = `${TYPE.title.weight} 27px ${TYPE.family}`;
+  c.fillText(board.name.toUpperCase(), stage.w / 2, y + 62);
   c.restore();
 }
 

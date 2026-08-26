@@ -201,33 +201,51 @@ steps), not a `performance.now()` read inside `render`. `render` only draws what
 
 ## The juice, and why each piece of it is there
 
-All of it lives in `poseOf()` in `game.js`, which is the single place that decides
-where a tile is and how deformed. Timers advance in `update`; nothing here reads
-a clock during render.
+Tile motion lives in `poseOf()`, the single place that decides where a tile is and
+how deformed. Particles live in `bits`. Timers advance in `update`; nothing here
+reads a clock during render, and nothing uses `Math.random` — the spread comes
+from the particle index so a replay is identical.
 
 - **Press on `onDown`, not on release.** The face sinks onto its own thickness
   and its shadow tightens. This is the one that matters most — a tile that does
   not answer the finger until it has already decided to move feels dead.
 - **Anticipation before the slide.** The tile loads up 0.16 cells *against* its
   arrow for 70 ms before it goes. Without it, leaving reads as a teleport.
-- **Stretch along the travel axis**, peaking mid-flight, so a tile smears the way
-  a thrown object does rather than sliding as a rigid square.
+- **Stretch along the travel axis**, plus **three echoes** strung out behind a
+  moving tile. Three is enough to read as speed; more costs fill rate for
+  something on screen a quarter of a second.
+- **Dust at the origin cell, not at the exit.** The eye is still where the tap
+  landed, so that is where a departure has to register.
 - **The blocker answers too.** A refused move shakes the tile twice toward its
-  exit *and* pulses whatever stopped it. Refusing without pointing at the cause
-  teaches nothing, and this game has no other way to explain itself.
+  exit, pulses whatever stopped it, and throws sparks onto the seam between them.
+  Refusing without pointing at the cause teaches nothing, and this game has no
+  other way to explain itself.
 - **Pitch climbs as the board empties** — `place` is played at up to 1.55× rate.
   Thirty taps of the same note is a chore; thirty rising ones is a build.
 - **Tiles arrive from the middle outwards**, staggered by distance from centre,
   so the animal assembles itself instead of appearing.
-- **The counter kicks** when a tile leaves. The one number that changes should be
-  the one thing that moves.
+- **Confetti in the level's own palette** on a clear, then the silhouette breathes
+  in the accent colour. It is what the level was, so it gets the last beat.
 - **`navigator.vibrate` where it exists** — 10 ms on a move, 18 on a refusal, a
   pattern on a clear. Guarded; desktop and iOS Safari simply skip it.
-- **The silhouette breathes in the accent colour** on a clear, then the next
-  animal arrives. It is what the level was, so it gets the last beat.
 
-Screen shake is deliberately tiny and only fires on a refusal. There is no fail
-state here, so shake has nothing else to mean.
+`MAX_BITS` is 130 and deliberately low. A mid-range phone will draw a few dozen
+small shapes a frame without noticing and will absolutely notice a few hundred.
+
+Screen shake is tiny and only fires on a refusal. There is no fail state here, so
+shake has nothing else to mean.
+
+## Screen furniture
+
+Tiles on an empty page look like a screenshot rather than a screen, so:
+
+- A **wash panel** behind the board, filled with the level's own dominant colour
+  pulled 86% back toward the page — each animal brings its own mood. `layout`
+  reserves `WASH_PAD` cells on every side for it; without that reservation the
+  panel is sized off a board that already claimed the full width and bleeds off
+  the screen.
+- **Pills, not labels.** `LEVEL n` on the left, the count on the right, and the
+  animal's name as the screen's title rather than a third equal label.
 
 ## Assets
 

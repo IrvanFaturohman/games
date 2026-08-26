@@ -42,6 +42,14 @@ function shade(hex, k) {
   return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
 
+// Blend toward another colour — used for the wash behind the board, which is the
+// level's own dominant colour pulled most of the way back to the page.
+export function mix(hexA, hexB, t) {
+  const a = parseInt(hexA.slice(1), 16), b = parseInt(hexB.slice(1), 16);
+  const ch = (sh) => Math.round((((a >> sh) & 255) * (1 - t)) + (((b >> sh) & 255) * t));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+
 // A white arrow vanishes on a cream muzzle and a dark one vanishes on an eye, so
 // pick per tile by luminance. The threshold sits high on purpose: a board of
 // mostly white arrows reads as one set, and only genuinely pale faces break away.
