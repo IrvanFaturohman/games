@@ -76,16 +76,45 @@ Figma files:
 - tangram/polygram `L5n7rj9XmQnAOxG9s0Tdpg`
 - unpuzzle `qSAVuXAtFdC89LKE4H0P5Z`
 
+## One clone per session
+
+Each game is worked on from **its own clone**, never a shared working tree:
+
+```
+~/games/              foundation + shared/    (this is the origin's source)
+~/games-stick-hero/   session 1
+~/games-unpuzzle/     session 2
+~/games-polygram/     session 3
+```
+
+All four track `origin/main` on GitHub. Separate clones mean separate index and
+HEAD, so `git add -A`, `stash` and `checkout` are safe — they can only ever see
+your own copy. In a shared tree they silently swallow another session's
+in-progress work, which git does not report as a conflict because it isn't one.
+
 ## Deploy
 
-Push to `main` → GitHub Pages serves it ~30s later.
+```
+git pull --rebase        # take in the other sessions' work
+git add -A
+git commit -m "..."
+git push                 # Pages rebuilds in ~30s
+```
+
+If the push is rejected, someone pushed first: repeat `git pull --rebase`, then
+push again. Because each session only touches its own game folder, the rebase
+replays cleanly with nothing to resolve.
 
 ```
 https://irvanfaturohman.github.io/games/<game>/
 ```
 
-`git pull --rebase` before pushing — three sessions share this repo.
+A real merge conflict is only possible in `shared/`, the one place all three
+games meet — which is why changes there are raised with the user first. If one
+happens, fix the marked file, `git add` it, then `git rebase --continue`.
+
 Never delete `.nojekyll`; without it Pages hides any underscore-prefixed path.
 
-For tight feel-tuning where a 30s round trip hurts:
-`npx serve . -p 5173` plus `cloudflared tunnel --url http://localhost:5173`.
+For tight feel-tuning where a 30s round trip hurts, serve from the **repo root**
+so `../shared/` imports resolve: `npx serve . -p 5173`, plus
+`cloudflared tunnel --url http://localhost:5173` to reach it from a phone.
