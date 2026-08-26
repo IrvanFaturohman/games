@@ -155,23 +155,31 @@ CSS-pixel space you draw in — hit-testing a piece is a direct comparison again
 its draw coords, no transform needed. `p.duration` is added on release, so it
 reads in `onHoldEnd`/`onUp`/`onTap` and is undefined before them.
 
-## Gesture budget: the flick does not arrive as a tap
+## The camera, and why the flick gesture is gone
 
-`input.js` fixes the thresholds, and this game's two verbs sit on opposite sides
-of them:
+The board is denser than a screen, so `view` fits the whole picture at zoom 1 and
+a camera rides on top of it:
 
-- `TAP_SLOP` 12 px — drift past this sets `p.moved` and **kills `onTap`**
-- `TAP_MAX_MS` 350 — slower than this is not a tap either
-- `HOLD_MS` 220 — when `onHoldStart` fires (unused here; do not route play through it)
+```
+screen = boardPixel * zoom + off
+```
 
-So a tap-to-slide lands on `onTap`, but a **flick never will** — by the time the
-thumb has travelled far enough to have a direction it is already `moved`. Detect
-the flick in `onUp` from `p.dx/p.dy` and `p.duration`, and have `onTap` and the
-flick path call the same `trySlide(piece)`. Deciding tap-vs-flick anywhere else
-fights the shared shell.
+`toBoard()` inverts it, and **every hit test goes through that inverse** — miss
+it and taps land on the tile that would have been there before the pan. One
+finger drags, two pinch: the midpoint pans first and the zoom happens about that
+same midpoint, so whatever sits between the fingers stays between them.
+`clampCamera` keeps the board's centre inside a generous box.
 
-Ignore non-primary pointers (`input.primary`, `pointers.size`) — two thumbs
-sliding two pieces into each other is not a case the occupancy sweep models.
+**The flick-to-slide gesture was removed.** Dragging is now panning, and the two
+are the same motion — there is no honest way to tell them apart. Nothing is lost:
+a tap already slides a tile along its own arrow, and the arrow is drawn on it.
+
+The thresholds in `input.js` still do real work here:
+
+- `TAP_SLOP` 12 px — past this `p.moved` is set, `onTap` is withheld, and only
+  then does a drag start panning. That is what stops a tap from nudging the board.
+- `TAP_MAX_MS` 350, `HOLD_MS` 220 — hold handlers are deliberately unwired, so
+  the 220–350 ms window where `onHoldEnd` and `onTap` both fire cannot bite.
 
 ## Audio
 

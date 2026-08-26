@@ -38,6 +38,38 @@ let held   = null;   // the tile under the finger, for the press-down
 let shake  = 0;
 let punch  = 0;      // the counter's kick when a tile leaves
 
+// Camera. `view` fits the whole picture at zoom 1; this rides on top of it so a
+// dense board can be pushed around and magnified to something a thumb can hit.
+// screen = boardPixel * zoom + off
+let zoom = 1, offX = 0, offY = 0;
+let pinch = null;
+let panLast = null;
+let clearStep = 0;
+const MIN_ZOOM = 0.75, MAX_ZOOM = 3.4;
+
+const toBoard = (px, py) => ({ x: (px - offX) / zoom, y: (py - offY) / zoom });
+
+// Zoom about a screen point, so whatever is under the fingers stays under them.
+function zoomAt(mx, my, next) {
+  const b = toBoard(mx, my);
+  zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+  offX = mx - b.x * zoom;
+  offY = my - b.y * zoom;
+}
+
+function resetCamera() { zoom = 1; offX = 0; offY = 0; pinch = null; }
+
+// Keep the board's centre inside a generous box — dragging the picture entirely
+// off screen is never what anyone meant to do.
+function clampCamera(stage) {
+  if (!view || !board) return;
+  const cx = (view.ox + board.cols * view.cell / 2) * zoom + offX;
+  const cy = (view.oy + board.rows * view.cell / 2) * zoom + offY;
+  const padX = stage.w * 0.35, padY = stage.h * 0.28;
+  offX += Math.max(padX - cx, 0) - Math.max(cx - (stage.w - padX), 0);
+  offY += Math.max(padY - cy, 0) - Math.max(cy - (stage.h - padY), 0);
+}
+
 // Capped hard: a mid-range phone will draw a few dozen small shapes a frame
 // without noticing and will absolutely notice a few hundred.
 const MAX_BITS = 130;
@@ -45,8 +77,10 @@ const bits = [];
 
 function spark(x, y, color, opts = {}) {
   if (bits.length >= MAX_BITS) return;
-  const { vx = 0, vy = 0, life = 0.5, size = 6, grav = 0, spin = 0, back = false } = opts;
-  bits.push({ x, y, vx, vy, life, max: life, size, color, grav, rot: 0, spin, back });
+  const { vx = 0, vy = 0, life = 0.5, size = 6, grav = 0, spin = 0, back = false,
+          ring = 0, grow = 0, width = 0 } = opts;
+  bits.push({ x, y, vx, vy, life, max: life, size, color, grav, rot: 0, spin, back,
+              ring, grow, width });
 }
 
 // Deterministic spread — update has to stay reproducible, so the "randomness"
@@ -71,7 +105,11 @@ function loadLevel(i) {
     // One dot per cell, in that cell's own colour, sitting under the tiles. It
     // shows the moment a tile slides off, so the picture is drawn in dots as the
     // board empties instead of leaving a grey hole behind.
-    dots: carved.tiles.map((t) => ({ x: t.x, y: t.y, color: t.color })),
+    dots: carved.tiles.map((t) => ({
+      x: t.x, y: t.y, color: t.color,
+      // The finish sweeps outward from the middle instead of flashing at once.
+      wake: Math.hypot(t.x - midX, t.y - midY) * 0.035,
+    })),
     palette: [...new Set(carved.tiles.map((t) => t.color))],
     tiles: carved.tiles.map((t) => ({
       x: t.x, y: t.y, color: t.color, dir: t.dir,
@@ -82,6 +120,7 @@ function loadLevel(i) {
     })),
   };
   clearT = -1;
+  clearStep = 0;
   held = null;
 }
 
@@ -168,24 +207,36 @@ function sparksAt(t, blocker) {
   }
 }
 
-function confetti() {
+function confetti(power = 1) {
   const { ox, oy, cell } = view;
   const cx = ox + (board.cols / 2) * cell, cy = oy + (board.rows / 2) * cell;
-  for (let i = 0; i < 34; i++) {
-    const a = spread(i, 34);
-    const speed = cell * (2.6 + (i % 5) * 0.7);
+  const n = Math.round(40 * power);
+
+  for (let i = 0; i < n; i++) {
+    const a = spread(i, n);
+    const speed = cell * (3.0 + (i % 5) * 0.9) * power;
     spark(cx, cy, board.palette[i % board.palette.length], {
-      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - cell * 1.6,
-      life: 0.9 + (i % 4) * 0.2, size: cell * (0.11 + (i % 3) * 0.04),
-      grav: cell * 6, spin: (i % 2 ? 1 : -1) * 11,
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - cell * 2.0,
+      life: 0.9 + (i % 4) * 0.22, size: cell * (0.13 + (i % 3) * 0.05),
+      grav: cell * 6.5, spin: (i % 2 ? 1 : -1) * 12,
+    });
+  }
+
+  // Rings carry the size of the moment in a way scattered bits cannot — they
+  // read as one event instead of forty.
+  for (let i = 0; i < 2; i++) {
+    spark(cx, cy, i ? ACC : COLOR.base, {
+      life: 0.55 + i * 0.15, ring: cell * 0.4, grow: cell * (11 - i * 3),
+      width: cell * (0.16 - i * 0.05),
     });
   }
 }
 
 function tileAt(px, py) {
   if (!view) return null;
-  const cx = Math.floor((px - view.ox) / view.cell);
-  const cy = Math.floor((py - view.oy) / view.cell);
+  const b = toBoard(px, py);
+  const cx = Math.floor((b.x - view.ox) / view.cell);
+  const cy = Math.floor((b.y - view.oy) / view.cell);
   return inside(cx, cy) ? occupant(cx, cy, null) : null;
 }
 
@@ -216,6 +267,7 @@ function startLevel(i, stage) {
   level = i;
   loadLevel(i);
   layout(stage);
+  resetCamera();
   bits.length = 0;
   screen = 'play';
 }
@@ -326,17 +378,32 @@ function update(dt, game) {
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.rot += b.spin * dt;
+    if (b.ring) b.ring += b.grow * dt;
   }
 
   if (alive === 0 && clearT < 0) {
     clearT = 0;
+    clearStep = 0;
     confetti();
     game.audio.play('perfect');
-    buzz([14, 60, 26]);
+    buzz([16, 50, 24, 50, 40]);
   }
 
   if (clearT >= 0) {
     clearT += dt;
+    // Three beats rather than one bang: the burst, the picture landing, and the
+    // flourish. One sound at one moment reads as an event ending, not a reward.
+    if (clearStep === 0 && clearT > 0.30) {
+      clearStep = 1;
+      confetti(0.6);
+      game.audio.play('score', { rate: 1.25 });
+      shake = Math.max(shake, 0.4);
+    }
+    if (clearStep === 1 && clearT > 0.60) {
+      clearStep = 2;
+      game.audio.play('perfect', { rate: 1.4 });
+      buzz(30);
+    }
     if (clearT >= CLEAR_HOLD) finishLevel(game);
   }
 }
@@ -357,11 +424,30 @@ function render(c, game) {
     c.translate(Math.sin(shake * 91) * shake * 7, Math.cos(shake * 67) * shake * 7);
   }
 
+  c.translate(offX, offY);
+  c.scale(zoom, zoom);
+
+  // The whole picture takes a breath on a clear.
+  if (clearT >= 0) {
+    const pcx = view.ox + board.cols * view.cell / 2;
+    const pcy = view.oy + board.rows * view.cell / 2;
+    const k = 1 + 0.07 * Math.sin(clamp01(clearT / 0.7) * Math.PI);
+    c.translate(pcx, pcy); c.scale(k, k); c.translate(-pcx, -pcy);
+  }
+
   drawDots(c);
   drawBits(c, true);
   for (const t of board.tiles) drawOne(c, t);
   drawBits(c, false);
   c.restore();
+
+  if (clearT >= 0 && clearT < 0.5) {
+    c.save();
+    c.globalAlpha = 0.42 * (1 - clearT / 0.5);
+    c.fillStyle = COLOR.white;
+    c.fillRect(0, 0, stage.w, stage.h);
+    c.restore();
+  }
 
   drawHud(c, stage);
   if (clearT >= 0) drawClear(c, stage);
@@ -373,6 +459,19 @@ function drawBits(c, back) {
   for (const b of bits) {
     if (!!b.back !== back) continue;
     const k = b.life / b.max;
+
+    if (b.ring) {
+      c.save();
+      c.globalAlpha = Math.min(1, k * 1.4) * 0.8;
+      c.strokeStyle = b.color;
+      c.lineWidth = b.width * k;
+      c.beginPath();
+      c.arc(b.x, b.y, b.ring, 0, Math.PI * 2);
+      c.stroke();
+      c.restore();
+      continue;
+    }
+
     const s = b.size * (0.45 + k * 0.55);
     c.save();
     c.globalAlpha = Math.min(1, k * 1.7);
@@ -387,12 +486,17 @@ function drawBits(c, back) {
 
 function drawDots(c) {
   const { ox, oy, cell } = view;
-  // On a clear the finished picture takes a breath before the next one arrives.
-  const swell = clearT >= 0 ? 1 + 0.55 * Math.sin(clamp01(clearT / 0.5) * Math.PI) : 1;
-  const r = cell * 0.155 * swell;
+  const base = cell * 0.155;
 
   c.save();
   for (const d of board.dots) {
+    // On a clear each dot pops as the wave reaches it, so the finish reads as
+    // the picture arriving rather than as one flash.
+    let r = base;
+    if (clearT >= 0) {
+      const k = clamp01((clearT - d.wake) / 0.42);
+      if (k > 0) r = base * (1 + 1.05 * Math.sin(k * Math.PI) + 0.35 * k);
+    }
     c.beginPath();
     c.arc(ox + (d.x + 0.5) * cell, oy + (d.y + 0.5) * cell, r, 0, Math.PI * 2);
     c.fillStyle = d.color;
@@ -666,18 +770,44 @@ boot({
     // Press down on touch, not on release — the tile has to answer the finger
     // before anything else happens.
     onDown(p) {
-      if (screen === 'play') { held = tileAt(p.x, p.y); return; }
-      dragFrom = scrollY + p.y;
+      if (screen !== 'play') { dragFrom = scrollY + p.y; return; }
+      held = tileAt(p.x, p.y);
+      panLast = { x: p.x, y: p.y };
+      pinch = null;
     },
 
-    onMove(p) {
-      if (screen === 'play') {
-        if (held && tileAt(p.x, p.y) !== held) held = null;
+    onMove(p, pointers, game) {
+      if (screen !== 'play') {
+        // Drag scrolls the grid; input.js already withholds onTap once the
+        // finger drifts past its slop, so the two gestures cannot both fire.
+        if (scrollMax > 0) scrollY = Math.min(scrollMax, Math.max(0, dragFrom - p.y));
         return;
       }
-      // Drag scrolls the grid; input.js already withholds onTap once the finger
-      // has drifted past its slop, so the two gestures cannot both fire.
-      if (scrollMax > 0) scrollY = Math.min(scrollMax, Math.max(0, dragFrom - p.y));
+
+      if (pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        if (!pinch || d < 1) { pinch = { d: Math.max(d, 1), mx, my, zoom }; return; }
+        held = null;
+        // Pan by the midpoint first, then magnify about it, so whatever sits
+        // between the fingers stays between them.
+        offX += mx - pinch.mx;
+        offY += my - pinch.my;
+        pinch.mx = mx; pinch.my = my;
+        zoomAt(mx, my, pinch.zoom * (d / pinch.d));
+        clampCamera(game.stage);
+        return;
+      }
+
+      // One finger drags the picture — but only once it has passed the same
+      // slop that decides a tap, so a tap never nudges the camera.
+      if (!p.moved || !panLast) return;
+      held = null;
+      offX += p.x - panLast.x;
+      offY += p.y - panLast.y;
+      panLast = { x: p.x, y: p.y };
+      clampCamera(game.stage);
     },
 
     onTap(p, game) {
@@ -691,28 +821,12 @@ boot({
       trySlide(tileAt(p.x, p.y), game.audio);
     },
 
-    // A flick never arrives as onTap — 12px of drift already sets p.moved and
-    // kills it — so the direction is read here instead, from where the finger
-    // started rather than where it ended.
-    onUp(p, pointers, game) {
-      if (screen !== 'play') { held = null; return; }
-      const from = view ? tileAt(p.startX, p.startY) : null;
+    // Dragging now pans the board, so the flick-to-slide gesture is gone: the
+    // two are the same motion and the arrow already says which way a tile goes.
+    onUp(p, pointers) {
       held = null;
-      if (!p.moved || !from) return;
-      if (Math.hypot(p.dx, p.dy) < view.cell * 0.3) return;
-
-      const [dx, dy] = DIR[from.dir];
-      const along = p.dx * dx + p.dy * dy;
-      const across = Math.abs(p.dx * dy - p.dy * dx);
-      if (along > across) {
-        trySlide(from, game.audio);
-      } else {
-        // Flicked the wrong way: answer it, and let the arrow do the teaching.
-        from.bounce = BOUNCE_DUR;
-        shake = Math.max(shake, 0.25);
-        game.audio.play('tap', { rate: 0.4 });
-        buzz(18);
-      }
+      panLast = null;
+      if (pointers.size < 2) pinch = null;
     },
   },
 
