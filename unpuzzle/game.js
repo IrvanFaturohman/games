@@ -120,7 +120,7 @@ function tileAt(px, py) {
 // onResize never fires for the initial size, so this is called once from ready
 // and again on every change. The URL bar sliding away on iOS is a change.
 function layout(stage) {
-  const padX = 20, top = 110, bottom = 104;   // bottom leaves room for the dots
+  const padX = 20, top = 110, bottom = 76;
   const availW = stage.w - padX * 2;
   const availH = stage.h - top - bottom;
   const cell = Math.floor(Math.min(availW / board.cols, availH / board.rows));
@@ -202,7 +202,6 @@ function render(c, game) {
   c.restore();
 
   drawHud(c, stage);
-  drawDots(c, stage);
   if (clearT >= 0) drawClear(c, stage);
 }
 
@@ -296,27 +295,8 @@ function drawHud(c, stage) {
   c.restore();
 }
 
-// Progress through the set, directly under the board.
-function drawDots(c, stage) {
-  const n = LEVELS.length;
-  const at = level % n;
-  const y = view.oy + board.rows * view.cell + Math.max(30, view.cell * 0.75);
-  const gap = 22;
-
-  c.save();
-  for (let i = 0; i < n; i++) {
-    const x = stage.w / 2 - ((n - 1) * gap) / 2 + i * gap;
-    const here = i === at;
-    c.beginPath();
-    c.arc(x, y, here ? 7 : 4.5, 0, Math.PI * 2);
-    c.fillStyle = here ? ACC : (i < at ? COLOR.baseSoft : COLOR.line);
-    c.fill();
-  }
-  c.restore();
-}
-
 function drawClear(c, stage) {
-  const y = view.oy + board.rows * view.cell + Math.max(30, view.cell * 0.75);
+  const y = view.oy + board.rows * view.cell + Math.max(44, view.cell * 0.9);
   const rise = easeOutBack(clamp01(clearT / 0.4));
 
   c.save();
@@ -324,7 +304,7 @@ function drawClear(c, stage) {
   c.textAlign = 'center';
   c.fillStyle = COLOR.base;
   c.font = `${TYPE.title.weight} ${TYPE.title.size}px ${TYPE.family}`;
-  c.translate(stage.w / 2, y + 52);
+  c.translate(stage.w / 2, y);
   c.scale(rise, rise);
   c.fillText('SELESAI!', 0, 0);
   c.restore();

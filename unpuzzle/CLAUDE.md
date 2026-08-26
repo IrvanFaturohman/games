@@ -229,12 +229,6 @@ a clock during render.
 Screen shake is deliberately tiny and only fires on a refusal. There is no fail
 state here, so shake has nothing else to mean.
 
-## Progress dots
-
-Directly under the board, one per level in `LEVELS`, current in accent. `layout`
-reserves 104px at the bottom for them — if that shrinks, the dots collide with
-the board on a short viewport.
-
 ## Assets
 
 Pieces are flat coloured polygons — draw them, do not export rectangles from
