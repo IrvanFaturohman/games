@@ -103,17 +103,29 @@ the hero walks off the end and falls. Score = platforms crossed.
 - **Perfect bonus.** Landing the stick tip inside a small centre zone of the next
   platform scores double and deserves loud feedback (flash, `audio.play('perfect')`,
   brief scale punch). This single reward is what makes people replay.
-- **Gap and width variety.** Randomise both, but never generate a gap that is
-  unreachable — clamp against the max stick length the player can grow before the
-  screen runs out.
+- **Difficulty must ramp, not just vary.** Flat random geometry reads as easy
+  forever however wide the spread — that was the first version's mistake.
+  `difficulty()` runs 0 → 1 over `RAMP_OVER` points; platforms narrow (~96 → ~26
+  px) and gaps stretch (~50 → ~250 px) together. Gaps are still clamped against
+  `maxReach()` so an unreachable one cannot be generated.
+- **The perfect zone scales with the platform** (`w * 0.13`, capped at
+  `PERFECT_MAX`). A fixed zone would make perfects *more* common as platforms
+  narrow — exactly backwards.
 - **Timing windows are generous early.** First three platforms should be near
   impossible to fail, or first-time players quit before they understand the verb.
 
-## Feel details worth the effort
+## Feel details, and what they are for
 
-Stick rotation eased rather than linear · hero walk cycle as two alternating
-rectangles · camera scroll eased over ~0.4s · screen shake on a fall · the stick
-wobbles slightly at full extension.
+Built: eased stick rotation · two-frame walk cycle · camera eased over 0.4s ·
+quadratic screen shake (subtle on a landing, hard on a fall) · stick sway that
+grows with its length · hero crouches while the stick grows and squashes on
+landing · dust puffs at the stick tip and under a fall · expanding ring, `+2`
+popup and screen flash on a perfect · score punch on every gain · hero tumbles
+as it falls · `navigator.vibrate` on land / perfect / death, guarded.
+
+Squash pivots on the feet and trades height for width, so the hero never appears
+to sink into the platform. The flash is capped at `0.28` alpha — anything more
+reads as a whiteout rather than a hit.
 
 ## Art direction
 
