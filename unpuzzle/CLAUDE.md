@@ -248,10 +248,28 @@ small shapes a frame without noticing and will absolutely notice a few hundred.
 Screen shake is tiny and only fires on a refusal. There is no fail state here, so
 shake has nothing else to mean.
 
+## Two screens
+
+`screen` is `'select'` or `'play'`, and `update`/`render`/every input handler
+branches on it first. `board` and `view` are null on the select screen, so
+anything that touches them must be behind that branch.
+
+**Select.** A grid of cards, two columns, each showing a **miniature of the
+level's own art** — nothing to author and no thumbnail to keep in sync with the
+drawing. A level opens once the one before it is cleared; `cleared` is an array
+of finished indices in the store under that key. The grid drag-scrolls when it
+overflows: `onMove` moves it and `onTap` picks a card, and the two cannot both
+fire because `input.js` withholds `onTap` once the finger passes `TAP_SLOP`.
+
+**Play.** A round back button top-left (hit radius 30, larger than the 21 it
+draws), the animal's name as the title, and the count pill on the right.
+Finishing a level marks it cleared and returns to select rather than advancing —
+the select screen is the spine of the game now, not a menu you pass through once.
+
 ## Screen furniture
 
-**Pills, not labels.** `LEVEL n` on the left, the count on the right, and the
-animal's name as the screen's title rather than a third equal label.
+**Pills, not labels**, and cards built the same way as tiles: a thickness under a
+face.
 
 A coloured wash panel behind the board was tried and removed — the user did not
 want a background behind the tiles. The page stays flat cream. If the board ever
