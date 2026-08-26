@@ -87,44 +87,6 @@ export function roundRect(ctx, x, y, w, h, r) {
   trace(ctx, x, y, w, h, Array.isArray(r) ? r : [r, r, r, r]);
 }
 
-// The animal's full footprint, faint, under everything. Tiles cover it exactly,
-// so it only shows where one has already left — and once the board is clear it
-// is the whole silhouette, which is what the player spent the level taking apart.
-//
-// Drawn as one shape: a corner is rounded only where both cells that would touch
-// it are absent, so cells inside the blob butt together square and the union
-// reads as a single outline rather than a grid of squares.
-export function drawGhost(ctx, cells, ox, oy, cell, opts = {}) {
-  const { color = COLOR.line, alpha = 0.5, scale = 1 } = opts;
-  const set = new Set(cells.map(([x, y]) => x + ',' + y));
-  const has = (x, y) => set.has(x + ',' + y);
-  const r = GEO.radius * cell;
-  const path = new Path2D();
-  for (const [cx, cy] of cells) {
-    const L = has(cx - 1, cy), R = has(cx + 1, cy);
-    const U = has(cx, cy - 1), D = has(cx, cy + 1);
-    trace(path, ox + cx * cell, oy + cy * cell, cell, cell, [
-      (!L && !U) ? r : 0, (!R && !U) ? r : 0,
-      (!R && !D) ? r : 0, (!L && !D) ? r : 0,
-    ]);
-  }
-  ctx.save();
-  if (scale !== 1) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const [x, y] of cells) {
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x + 1);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y + 1);
-    }
-    const cx = ox + ((minX + maxX) / 2) * cell;
-    const cy = oy + ((minY + maxY) / 2) * cell;
-    ctx.translate(cx, cy); ctx.scale(scale, scale); ctx.translate(-cx, -cy);
-  }
-  ctx.fillStyle = color;
-  ctx.globalAlpha = alpha;
-  ctx.fill(path);
-  ctx.restore();
-}
-
 // The shape points up at zero rotation, so this is how far to turn it.
 const TURN = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
 

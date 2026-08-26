@@ -241,8 +241,12 @@ from the particle index so a replay is identical.
   Thirty taps of the same note is a chore; thirty rising ones is a build.
 - **Tiles arrive from the middle outwards**, staggered by distance from centre,
   so the animal assembles itself instead of appearing.
-- **Confetti in the level's own palette** on a clear, then the silhouette breathes
-  in the accent colour. It is what the level was, so it gets the last beat.
+- **A dot under every cell, in that cell's own colour.** It is covered while the
+  tile sits on it and shows the moment the tile slides off, so the picture is
+  *drawn in dots* as the board empties — an empty board is the finished ice cream,
+  not a grey hole where one used to be. This replaced a merged darker silhouette,
+  which read as damage rather than as a picture.
+- **Confetti in the level's own palette** on a clear, and the dots swell with it.
 - **`navigator.vibrate` where it exists** — 10 ms on a move, 18 on a refusal, a
   pattern on a clear. Guarded; desktop and iOS Safari simply skip it.
 

@@ -10,7 +10,7 @@ import { boot } from '../shared/boot.js';
 import { COLOR, TYPE, ACCENT } from '../shared/tokens.js';
 import { LEVELS } from './levels.js';
 import { carve } from './carve.js';
-import { drawTile, drawGhost, roundRect } from './style.js';
+import { drawTile, roundRect } from './style.js';
 
 const NAME = 'unpuzzle';
 const ACC = ACCENT[NAME];
@@ -31,7 +31,7 @@ let scrollY = 0, scrollMax = 0, dragFrom = 0;
 let enter   = 0;          // the select screen's entrance
 
 let level  = 0;
-let board  = null;   // { name, cols, rows, ghost, tiles, total }
+let board  = null;   // { name, cols, rows, dots, tiles, total }
 let view   = null;   // the one cell -> screen transform; everything routes through it
 let clearT = -1;     // >= 0 once the board is empty and the celebration is running
 let held   = null;   // the tile under the finger, for the press-down
@@ -68,7 +68,10 @@ function loadLevel(i) {
     cols: carved.cols,
     rows: carved.rows,
     total: carved.tiles.length,
-    ghost: carved.tiles.map((t) => [t.x, t.y]),
+    // One dot per cell, in that cell's own colour, sitting under the tiles. It
+    // shows the moment a tile slides off, so the picture is drawn in dots as the
+    // board empties instead of leaving a grey hole behind.
+    dots: carved.tiles.map((t) => ({ x: t.x, y: t.y, color: t.color })),
     palette: [...new Set(carved.tiles.map((t) => t.color))],
     tiles: carved.tiles.map((t) => ({
       x: t.x, y: t.y, color: t.color, dir: t.dir,
@@ -354,7 +357,7 @@ function render(c, game) {
     c.translate(Math.sin(shake * 91) * shake * 7, Math.cos(shake * 67) * shake * 7);
   }
 
-  drawBoardGhost(c);
+  drawDots(c);
   drawBits(c, true);
   for (const t of board.tiles) drawOne(c, t);
   drawBits(c, false);
@@ -382,20 +385,20 @@ function drawBits(c, back) {
   }
 }
 
-function drawBoardGhost(c) {
+function drawDots(c) {
   const { ox, oy, cell } = view;
-  if (clearT < 0) {
-    drawGhost(c, board.ghost, ox, oy, cell);
-    return;
+  // On a clear the finished picture takes a breath before the next one arrives.
+  const swell = clearT >= 0 ? 1 + 0.55 * Math.sin(clamp01(clearT / 0.5) * Math.PI) : 1;
+  const r = cell * 0.155 * swell;
+
+  c.save();
+  for (const d of board.dots) {
+    c.beginPath();
+    c.arc(ox + (d.x + 0.5) * cell, oy + (d.y + 0.5) * cell, r, 0, Math.PI * 2);
+    c.fillStyle = d.color;
+    c.fill();
   }
-  // The silhouette is what the level was; on a clear it takes a breath in the
-  // accent colour before the next animal arrives.
-  const k = clamp01(clearT / 0.45);
-  drawGhost(c, board.ghost, ox, oy, cell, {
-    color: ACC,
-    alpha: 0.30 + 0.45 * Math.sin(k * Math.PI),
-    scale: 1 + 0.05 * Math.sin(k * Math.PI),
-  });
+  c.restore();
 }
 
 // Where a tile is right now, and how deformed — one place so nothing drifts.
