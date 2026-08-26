@@ -67,10 +67,9 @@ is no cutting into multi-cell pieces. **The tile face is the picture's colour** 
 the board is the animal, full colour — and the arrow on it stays neutral so it
 never competes with the drawing. Eyes are cells painted `ink`.
 
-Every tile's face is nudged a few percent lighter or darker by its own
-coordinates (`tone()` in style.js, applied once at load). A large field of one
-flat colour reads as a slab; the nudge turns it into a surface while still
-obviously being one colour.
+Tile faces are flat. Nudging each one a few percent by its coordinates was tried
+and removed — it reads as gradient noise, and the picture wants clean blocks of
+colour.
 
 Both the tile's thickness and its arrow are derived from its own face colour, so
 adding a colour to the palette needs nothing else: the thickness is a 0.74 shade
@@ -101,7 +100,11 @@ rows** is the useful range; a 9×11 board fills a phone with ~38px tiles, about
 the smallest a thumb wants.
 
 Subject matter is not limited to animals — plants, fruit, food and objects all
-work, and many of them are naturally upright, which the frame rewards. A fish
+work, and many of them are naturally upright, which the frame rewards. **Pick
+subjects that are colourful in themselves.** A rocket was tried and dropped: its
+body is one flat cream field, so the level was a grey slab no matter how it was
+drawn. A hot air balloon replaced it — five vertical gores, because being
+multicoloured is the whole point of the object. A fish
 drawn side on is a landscape shape and fought the frame; a carrot, a rocket or a
 rabbit's ears fill it.
 

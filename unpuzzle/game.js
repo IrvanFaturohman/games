@@ -10,7 +10,7 @@ import { boot } from '../shared/boot.js';
 import { COLOR, TYPE, ACCENT } from '../shared/tokens.js';
 import { LEVELS } from './levels.js';
 import { carve } from './carve.js';
-import { drawTile, roundRect, tone } from './style.js';
+import { drawTile, roundRect } from './style.js';
 
 const NAME = 'unpuzzle';
 const ACC = ACCENT[NAME];
@@ -106,13 +106,13 @@ function loadLevel(i) {
     // shows the moment a tile slides off, so the picture is drawn in dots as the
     // board empties instead of leaving a grey hole behind.
     dots: carved.tiles.map((t) => ({
-      x: t.x, y: t.y, color: tone(t.color, t.x, t.y),
+      x: t.x, y: t.y, color: t.color,
       // The finish sweeps outward from the middle instead of flashing at once.
       wake: Math.hypot(t.x - midX, t.y - midY) * 0.035,
     })),
     palette: [...new Set(carved.tiles.map((t) => t.color))],
     tiles: carved.tiles.map((t) => ({
-      x: t.x, y: t.y, color: tone(t.color, t.x, t.y), dir: t.dir,
+      x: t.x, y: t.y, color: t.color, dir: t.dir,
       gone: false, slide: null, bounce: 0, jiggle: 0, press: 0,
       // Tiles arrive from the middle outwards, so the animal assembles itself
       // rather than appearing all at once.

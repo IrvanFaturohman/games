@@ -41,30 +41,6 @@ export const LEVELS = [
   },
 
   {
-    name: 'roket',
-    art: [
-      '.....C.....',
-      '....CCC....',
-      '...CCCCC...',
-      '...CCCCC...',
-      '..CCSSSCC..',
-      '..CCSSSCC..',
-      '..CCCCCCC..',
-      '..CCCCCCC..',
-      '..CCCCCCC..',
-      '.RCCCCCCCR.',
-      'RRCCCCCCCRR',
-      'RRCCCCCCCRR',
-      '..CCCCCCC..',
-      '...OOOOO...',
-      '...O.O.O...',
-      '....O.O....',
-    ],
-    palette: { C: P.cream, S: P.sky, R: P.coral, O: P.orange },
-    seed: 5,
-  },
-
-  {
     name: 'labu',
     art: [
       '......L......',
@@ -106,6 +82,30 @@ export const LEVELS = [
     ],
     palette: { Y: P.amber, W: P.wood, L: P.leaf },
     seed: 11,
+  },
+
+  {
+    name: 'balon udara',
+    art: [
+      '.....GGG.....',
+      '...YYGGGSS...',
+      '..RYYGGGSSV..',
+      '.RRYYGGGSSVV.',
+      'RRRYYGGGSSVVV',
+      'RRRYYGGGSSVVV',
+      'RRRYYGGGSSVVV',
+      '.RRYYGGGSSVV.',
+      '..RYYGGGSSV..',
+      '...YYGGGSS...',
+      '....YGGGS....',
+      '.....W.W.....',
+      '....WWWWW....',
+      '....WWWWW....',
+    ],
+    palette: {
+      R: P.coral, Y: P.amber, G: P.leaf, S: P.sky, V: P.violet, W: P.wood,
+    },
+    seed: 5,
   },
 
   {
