@@ -44,11 +44,45 @@ Import from `shared/`, do not reimplement:
 | `storage.js` | namespaced localStorage, guarded against private browsing |
 | `tokens.js` | colors, type scale, spacing |
 
-`render(ctx, game)` draws in **CSS pixels** — the DPR transform is already
-applied, so never multiply by `devicePixelRatio` yourself.
+### The callback contract
 
-`update(dt)` runs at a fixed 1/60s step and may run several times per frame.
-Keep it pure of rendering and free of `performance.now()`.
+```js
+ready(game)                  // awaited before the first frame — put loadAll() here
+update(dt, game)             // fixed 1/60 s step, may run up to 15x in one frame
+render(ctx, game, alpha)     // every rAF; alpha = leftover accumulator fraction
+```
+
+`game` is `{ stage, audio, store, input, name }` — the *same object* reaches every
+callback, input handlers included. Those handlers get `game` appended as the
+**last** argument, so their arity differs:
+
+```js
+onDown(p, pointers, game)   onMove(p, pointers, game)   onUp(p, pointers, game)
+onTap(p, game)              onHoldStart(p, game)        onHoldEnd(p, dur, game)
+```
+
+`render` draws in **CSS pixels** — the DPR transform is already applied, so never
+multiply by `devicePixelRatio` yourself. `update` must stay free of rendering and
+of `performance.now()`; its 15-step ceiling is `maxFrame 0.25 ÷ step 1/60`.
+
+### Three traps the shell sets
+
+**`onResize` never fires for the initial size.** `createStage` sizes the stage
+before any listener can exist, and `resize()` early-returns when w/h/dpr are
+unchanged — which makes the `stage.resize()` inside `boot` a no-op too. Write
+layout as a function, call it once in `ready`, and re-call it from `onResize`.
+Subscribing alone leaves you rendering uninitialised layout until something
+genuinely changes size, which on a phone means the URL bar sliding away.
+
+**A rejected `ready` looks like a dead page, not an error.** `boot` awaits `ready`
+*before* wiring the `#tap-to-start` gate, so a rejection leaves that gate up
+forever — and at `z-index:10` it swallows every pointer event. The symptom is a
+page stuck on TAP UNTUK MULAI that ignores taps; the only evidence is a console
+error. `loadAll()` rejects on any missing asset, so one wrong path does exactly
+this.
+
+**A pointer that held fires both `onHoldEnd` and `onUp`**, in that order, and
+never `onTap`. `p.duration` exists only from `onUp` onward.
 
 ## Assets
 

@@ -43,8 +43,11 @@ get wrong because they are spread across three files:
 
 - `ready(game)` — async, awaited before the first frame. `game` is
   `{stage, audio, store, input, name}` and the *same object* reaches every other
-  callback. **If `ready` rejects, the loop never starts and the screen stays
-  blank** — a failed `loadAll()` looks like a dead game, not an error.
+  callback. **If `ready` rejects, the loop never starts and the `#tap-to-start`
+  gate is never wired** — the page sits on TAP UNTUK MULAI and ignores taps,
+  because that gate covers the canvas at `z-index:10`. Nothing surfaces but a
+  console error, so a failed `loadAll()` reads as a dead game rather than a
+  broken asset path.
 - `update(dt, game)` — fixed 1/60 s step, and may run up to 15 times in one frame
   after a stall. No `performance.now()`, no drawing.
 - `render(ctx, game, alpha)` — draws in CSS pixels, DPR transform already applied.
@@ -63,8 +66,11 @@ Other decisions the shell already made:
   Presets: `tap place perfect score fail whoosh`.
 - `store` is namespaced and swallows private-browsing failures; `store.bestScore(n)`
   reads and writes the high score in one call.
-- `stage.onResize(fn)` returns an unsubscribe. DPR is capped at 2 — never multiply
-  by `devicePixelRatio` yourself.
+- `stage.onResize(fn)` returns an unsubscribe, and fires only on *change* — never
+  for the initial size, because the stage is sized before any listener exists.
+  Compute the platform/camera layout in a function, call it once in `ready`, then
+  re-call it from `onResize`. DPR is capped at 2 — never multiply by
+  `devicePixelRatio` yourself.
 
 ## Core loop
 
