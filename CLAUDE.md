@@ -64,6 +64,8 @@ Import from `shared/`, do not reimplement:
 | `audio.js` | synthesised SFX, iOS unlock handled |
 | `storage.js` | namespaced localStorage, guarded against private browsing |
 | `tokens.js` | colors, type scale, spacing |
+| `assets.js` | `loadAll({name: url})` → `{name: <img>}`; a miss rejects loudly |
+| `core.css` | the no-scroll, no-zoom, no-tap-flash page shell each `index.html` links |
 
 ### The callback contract
 
@@ -85,6 +87,11 @@ onTap(p, game)              onHoldStart(p, game)        onHoldEnd(p, dur, game)
 `render` draws in **CSS pixels** — the DPR transform is already applied, so never
 multiply by `devicePixelRatio` yourself. `update` must stay free of rendering and
 of `performance.now()`; its 15-step ceiling is `maxFrame 0.25 ÷ step 1/60`.
+
+Two more things the canvas decides for you: `stage.dpr` is capped at 2, so a 3x
+phone deliberately renders at 2x, and the context is created with
+`{alpha: false}` — `clearRect` paints **black**, not cream, so fill `COLOR.bg`
+every frame instead.
 
 ### Three traps the shell sets
 
