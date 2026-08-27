@@ -22,6 +22,7 @@ const ACC = ACCENT[NAME];
 const BOARD_FILL = 1;          // grid size as a fraction of the play area
 const CELL_FILL = 0.96;        // object size as a fraction of its cell
 const NEXT_LEVEL_DELAY = 1.2;
+const ENTRANCE_STAGGER = 0.4;  // total, not per cell
 const HUD_HEIGHT = 78;
 const PAD = 16;                // HUD margins only; the board has none
 const BOARD_BOTTOM = 6;
@@ -192,8 +193,12 @@ async function loadArt() {
     const base = await image(asset.src);
     if (token !== loadToken) return; // a newer level started while we waited
     art = { base, accent: accentColor(base, ACC) };
+    // Unity staggers a flat 12ms per cell. At 66 cells that is a 0.8s wait
+    // before the last object exists, so the stagger is capped by total time and
+    // the entrance costs the same at every grid size.
+    const step = Math.min(0.012, ENTRANCE_STAGGER / Math.max(1, cells.length));
     for (let i = 0; i < cells.length; i++) {
-      cells[i].pop = { from: 0, to: 1, dur: 0.35, delay: i * 0.012, ease: 'outBack', t: 0 };
+      cells[i].pop = { from: 0, to: 1, dur: 0.35, delay: i * step, ease: 'outBack', t: 0 };
     }
     acceptingInput = true;
   } catch (err) {

@@ -48,8 +48,8 @@ random, which is what stops a retry from being pure memory.
 
 `subtle` runs 0.1 (obvious) to 0.95 (nearly invisible) and rides a sine wave on
 top of the ramp, so the curve breathes instead of climbing monotonically. Levels
-divisible by 10 are boss levels at 4 impostors. The grid caps at 6x7 — past that
-the cells are narrower than a thumb.
+divisible by 10 are boss levels at 4 impostors. Columns cap at 6 — past that the
+cells are narrower than a thumb — and `rowsFor` sets the rows from that.
 
 ## Assets
 
@@ -159,11 +159,23 @@ Cell size is `min(area/cols, area/rows)`; hit test is a circle of half a cell, s
 a thumb landing in the gap between two objects misses rather than punishing the
 nearest one.
 
-**What is still not dense is the vertical margin.** A square-cell grid can only
-fill a 420x776 play area when `cols/rows` is about 0.54, which needs 4x7, 5x9 or
-6x11 — every campaign level is squarer than that (3x4 up to 6x7), so 40-140px of
-background is left above and below. Closing that gap means more cells per level
-than `levels.js` asks for, which is a difficulty change, not a layout one.
+**Rows come from the screen's aspect, not from Unity** (`rowsFor` in
+`levels.js`). A square-cell grid only fills a 420x776 play area when `cols/rows`
+is about 0.54 — 3x6, 4x7, 5x9, 6x11. Unity's rows were all squarer than that and
+left 40-140px of background above and below. Same columns, more rows, so a level
+holds more cells than the original: 4 cols 20 to 28, 6 cols 42 to 66. Impostor
+counts are untouched, so it is more haystack, not more needles. Measured on a
+420x776 board the margins are now 0-21px.
+
+`rowsFor` is fixed per column count and never derived from the live viewport:
+`RoundState` is built from the cell count at level start, so reading the screen
+would let a rotation or a URL bar sliding away resize a round already in play. It
+is tuned for a ~1.85 tall screen; a short one (an SE) keeps some side margin.
+
+**The entrance stagger is capped in total, not per cell.** Unity delays each cell
+a flat 12ms; at 66 cells that is 0.8s before the last object exists. `game.js`
+divides `ENTRANCE_STAGGER` (0.4s) across the grid instead, so a big level opens as
+fast as a small one.
 
 ## Not ported yet
 
