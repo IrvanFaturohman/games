@@ -23,7 +23,8 @@ Module split mirrors the C# so the two read against each other:
 | `rules.js` | `Gameplay/AnomalyType.cs`, `ObjectVisualState.cs`, `ImpostorRules.cs` |
 | `levels.js` | `Gameplay/LevelConfigGenerator.cs` |
 | `board.js` | `Gameplay/BoardLayout.cs` |
-| `objects.js` | `Data/ObjectSetDefinition.cs` + the fruit PNGs |
+| `catalog.js` | `Data/ObjectCatalog.cs`, `ObjectSetDefinition.cs` |
+| `sprites.js` | the sprite half of `GridObjectView.cs` |
 | `game.js` | `Gameplay/RoundController.cs`, `GridObjectView.cs`, `RoundFeedback.cs`, `UI/HudView.cs` |
 
 ## Core loop
@@ -50,15 +51,63 @@ top of the ramp, so the curve breathes instead of climbing monotonically. Levels
 divisible by 10 are boss levels at 4 impostors. The grid caps at 6x7 — past that
 the cells are narrower than a thumb.
 
+## Assets
+
+**Every level gets its own object.** They are Half It's sticker sheets, exported
+from Figma (file `F7Vlc4oODiLdMrZEl81oqi`) into `assets/<theme>-<slug>.svg`.
+`catalog.js` maps level to sticker and to a background colour.
+
+**There are 62, not 100.** The Figma file has twelve sheets of twenty slots, but
+only 62 are drawn — every other slot is a `locked` placeholder with no art inside
+its frame, and Sports, Kitchen, Tools and Halloween are entirely placeholder. So
+levels 1-62 are each unique and level 63 wraps back to the first sticker, on a
+different background so the repeat is not obvious. Drawing more stickers in Figma
+and re-exporting is what raises that ceiling; nothing in code needs to change
+beyond adding the slug to its theme.
+
+**Exporting more.** `download_assets` on the sticker's inner art frame (the child
+of `LvNN Name Grade`, not the wrapper — the wrapper carries Half It's grade badge)
+returns one SVG in `svgAssets`. When a node returns several, they are its
+sub-layers and none of them is the whole sticker: fall back to
+`defaultFormat: 'svg'`, which returns the node whole but drags in two rects that
+must be deleted — the `#F5F5F5` backing the override re-adds, and the sheet's own
+390x844 background.
+
+**The white keyline and drop shadow are stripped**, on purpose: this game wants
+flat art on bold colour, and the sticker chrome that reads well on Half It's cream
+paper reads as a muddy blob on a saturated field. Both live in Figma, untouched,
+because the same sheets are Half It's shipping art. Two structural markers to
+strip after any re-export, never a colour test — plenty of stickers are
+legitimately white:
+
+- Figma renders an outside stroke as `<path mask="url(#path-N-outside-M)" fill="white"/>`
+  plus its `<mask>` definition. Delete both. (59 of 62 files.)
+- The Space stickers encode the same edge as a path that is both `fill="white"`
+  and `stroke="white"`. Delete those. (2 files.)
+- The shadow is a `filter="url(#filterN_d_...)"` attribute plus its `<filter>`
+  definition. Deleting both took the folder from 1.0 MB to 364 KB.
+
 ## Deviations from Unity, all deliberate
 
-- **Fruit are drawn, not exported.** Unity ships a 512px PNG per fruit and per
-  shape variant; here each is a dozen canvas paths in a unit box, so the shape
-  variants are a parameter on one drawing instead of a second file that can drift.
+- **The shape anomaly swaps the sticker, it does not swap a variant.** Unity
+  authors two shape variants per fruit; Figma has none, so the impostor becomes a
+  different sticker from the same theme. `THEMES[].items` is ordered by how alike
+  the stickers look, and `alternatives()` returns them farthest-first, which is
+  the obvious-to-subtle order `ImpostorRules` already expects. **Reordering that
+  list retunes every shape level in the theme.** A theme with one item (vehicles)
+  has no alternative at all and falls back to a colour anomaly.
+- **Art loads per level, not upfront.** 62 SVGs is 364 KB and `loadAll()` would
+  pull all of it before the first frame. A level fetches its two stickers, then
+  prefetches the next level's; `loadToken` drops a slow level's images if a newer
+  level started while they were in flight.
 - **Two sprites are cached per round.** Only `normal` and `impostor` appearances
-  exist, so each is drawn once into an offscreen canvas and the grid is blits.
-  48 fruit worth of bezier per frame is what makes a mid-range phone drop to 30.
-  Opacity, scale and rotation stay at blit time — never bake them.
+  exist, so each is rasterised once into an offscreen canvas and the grid is
+  blits — worth more here than with drawn shapes, since re-rasterising an SVG per
+  frame is far more expensive than a dozen bezier paths. Opacity, scale and
+  rotation stay at blit time; never bake them. The colour anomaly *is* baked,
+  through a `multiply` fill re-clipped with `destination-in`.
+- **Burst particles sample the sticker** (`accentColor`) rather than reading a
+  hand-listed colour: 62 hand-picked colours is 62 chances to forget one.
 - **The level is saved.** Unity always starts at `startLevel`; here the phone
   resumes where it left off, because the whole point is picking it up between
   other things.
@@ -80,6 +129,4 @@ than punishing the nearest fruit.
 ## Not ported yet
 
 `endless()` exists in `levels.js` and nothing calls it — same as in Unity, where
-the campaign loops back to level 1 at the cap. Sets are still the two Unity has,
-strawberry and orange; the catalog cycles them, so adding a third changes which
-set every level past it uses.
+the campaign loops back to level 1 at the cap.

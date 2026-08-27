@@ -1,0 +1,32 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="68.518" height="82.3571" viewBox="0 0 68.518 82.3571" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Potato">
+<g id="Union">
+<path d="M26.4238 10.8998C35.8945 2.83094 50.2036 3.07099 58.123 13.0463C64.1335 20.621 64.7158 31.091 61.0712 39.8754C59.8847 42.7407 59.3027 45.1306 58.9453 48.1693C57.976 56.4115 53.5572 63.7838 46.8134 68.2054C40.0698 72.6269 33.7718 74.0871 25.9189 72.6342H25.9228C18.5159 71.2623 11.6359 67.5082 8.21969 60.6381C2.97943 50.102 4.73345 37.3713 11.831 28.2181L18.2949 21.5248C20.8339 17.6415 22.8898 13.909 26.4238 10.8998Z" fill="white"/>
+</g>
+<path id="Vector" d="M25.9226 72.6339C18.5155 71.262 11.6353 67.5078 8.21922 60.6374C2.97897 50.1013 4.73308 37.371 11.8306 28.2178L18.2944 21.5244C20.8334 17.6411 22.8897 13.9091 26.4238 10.8998C35.8946 2.83085 50.2039 3.07055 58.1232 13.0461C64.1337 20.6209 64.7159 31.0906 61.0713 39.875C59.8847 42.7404 59.3025 45.1301 58.945 48.1689C57.9758 56.4112 53.5574 63.7831 46.8136 68.2048C40.0698 72.6265 33.7719 74.0869 25.9189 72.6339H25.9226Z" fill="#E1A356"/>
+<g id="Ellipse 1">
+<ellipse cx="18.6069" cy="46.1651" rx="1.55415" ry="2.0722" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 2">
+<ellipse cx="26.3776" cy="31.1417" rx="2.0722" ry="1.55415" transform="rotate(19.7043 26.3776 31.1417)" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 3">
+<circle cx="37.2567" cy="19.7445" r="1.55415" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 4">
+<ellipse cx="32.0762" cy="59.6344" rx="1.55415" ry="1.0361" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 5">
+<ellipse cx="41.4011" cy="50.3095" rx="1.55415" ry="2.0722" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 6">
+<ellipse cx="45.0275" cy="35.286" rx="1.0361" ry="1.55415" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 8">
+<path d="M54.3524 54.972C54.3524 55.8303 53.8885 56.5261 53.3163 56.5261C52.744 56.5261 52.2802 55.8303 52.2802 54.972C52.2802 54.1136 52.744 53.4178 53.3163 53.4178C53.8885 53.4178 54.3524 54.1136 54.3524 54.972Z" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+<g id="Ellipse 7">
+<ellipse cx="50.208" cy="19.7445" rx="1.0361" ry="1.55415" fill="#090909" fill-opacity="0.16" style="mix-blend-mode:soft-light"/>
+</g>
+</g>
+</svg>

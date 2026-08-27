@@ -1,15 +1,16 @@
-// Find the impostor: a grid of identical fruit, one property off on a few of
+// Find the impostor: a grid of identical objects, one property off on a few of
 // them. Port of the Unity project at ~/Documents/GitHub/find-the-difference —
 // RoundController is this file, the rest kept their own modules so the two
 // codebases stay readable against each other.
 
 import { boot } from '../shared/boot.js';
 import { ACCENT, COLOR } from '../shared/tokens.js';
-import { setForLevel } from './objects.js';
+import { ASSET_COUNT, alternatives, assetForLevel } from './catalog.js';
 import { campaign, MAX_CAMPAIGN_LEVELS } from './levels.js';
-import { buildImpostorState, normalState } from './rules.js';
+import { ANOMALY, buildImpostorState, normalState } from './rules.js';
 import { cellCenter, fitBoard, hitTest } from './board.js';
 import { CORRECT, WRONG, createRng, createRound } from './round.js';
+import { accentColor, image, makeSprite, prefetch } from './sprites.js';
 
 const NAME = 'find-the-difference';
 const ACC = ACCENT[NAME];
@@ -19,6 +20,9 @@ const NEXT_LEVEL_DELAY = 1.2;
 const HUD_HEIGHT = 86;
 const PAD = 16;
 const PAD_BOTTOM = 28;
+// Sprites are rasterised bigger than they are ever drawn so the pop-in
+// overshoot and the 1.5x correct-tap kick stay crisp.
+const SPRITE_HEADROOM = 1.6;
 
 const CORRECT_COLOR = '#FF4757';
 const WRONG_COLOR = '#2E3336';
@@ -47,11 +51,13 @@ const rng = createRng();
 let app = null;
 let level = 1;
 let config = null;
-let set = null;
+let asset = null;
 let round = null;
 let impostor = null;
 let normal = normalState();
 
+let art = null;        // {base, variant, accent} once the level's images land
+let loadToken = 0;     // guards a slow level's images from landing after the next
 let cells = [];
 let board = null;
 let layoutKey = '';
@@ -114,22 +120,24 @@ boot({
   render(c, game) {
     const { stage } = game;
     layout(stage);
-    ensureSprites(stage.dpr);
 
     // Same colour top and bottom: the style calls for a dead-flat field.
-    c.fillStyle = set.theme;
+    c.fillStyle = asset.background;
     c.fillRect(0, 0, stage.w, stage.h);
 
-    c.save();
-    if (camShake) {
-      const k = 1 - camShake.t / camShake.dur;
-      const amp = camShake.amp * k;
-      c.translate(Math.sin(camShake.t * 61) * amp, Math.cos(camShake.t * 47) * amp);
+    if (art) {
+      ensureSprites(stage.dpr);
+      c.save();
+      if (camShake) {
+        const k = 1 - camShake.t / camShake.dur;
+        const amp = camShake.amp * k;
+        c.translate(Math.sin(camShake.t * 61) * amp, Math.cos(camShake.t * 47) * amp);
+      }
+      drawGrid(c);
+      drawParticles(c);
+      drawPopups(c);
+      c.restore();
     }
-    drawGrid(c);
-    drawParticles(c);
-    drawPopups(c);
-    c.restore();
 
     drawHud(c, stage);
   },
@@ -138,10 +146,11 @@ boot({
 function startLevel(n) {
   level = n;
   config = campaign(level);
-  set = setForLevel(level);
+  asset = assetForLevel(level);
   round = createRound(config.totalCells, config.impostorCount, rng);
-  impostor = buildImpostorState(config.anomaly, config.subtle, set.variantCount, rng);
-  normal = normalState();
+
+  const alts = alternatives(asset);
+  impostor = buildImpostorState(config.anomaly, config.subtle, alts.length, rng);
 
   cells = [];
   for (let i = 0; i < config.totalCells; i++) {
@@ -150,11 +159,12 @@ function startLevel(n) {
       // read as one animated object and hide the animation anomaly.
       phase: Math.random() * Math.PI * 2,
       impostor: round.isImpostor(i),
-      pop: { from: 0, to: 1, dur: 0.35, delay: i * 0.012, ease: 'outBack', t: 0 },
+      pop: null,
       shake: null,
     });
   }
 
+  art = null;
   layoutKey = '';
   sprites = null;
   popups = [];
@@ -164,10 +174,38 @@ function startLevel(n) {
   comboDisplay = 0;
   comboScale = 0;
   comboTarget = 0;
-  acceptingInput = true;
+  acceptingInput = false;
   nextLevelIn = 0;
 
   app?.store.set('level', level);
+  loadArt(alts);
+}
+
+async function loadArt(alts) {
+  const token = ++loadToken;
+  // The shape anomaly has no variant art to reach for — it swaps the impostor
+  // for a different sticker in the same theme, ordered so variant 0 is the one
+  // that looks least like the base.
+  const variantSrc = config.anomaly === ANOMALY.SHAPE && impostor.variantIndex >= 0
+    ? alts[Math.min(impostor.variantIndex, alts.length - 1)].src
+    : asset.src;
+
+  try {
+    const [base, variant] = await Promise.all([image(asset.src), image(variantSrc)]);
+    if (token !== loadToken) return; // a newer level started while we waited
+    art = { base, variant, accent: accentColor(base, ACC) };
+    for (let i = 0; i < cells.length; i++) {
+      cells[i].pop = { from: 0, to: 1, dur: 0.35, delay: i * 0.012, ease: 'outBack', t: 0 };
+    }
+    acceptingInput = true;
+  } catch (err) {
+    // A missing sticker would otherwise be an empty screen with no explanation.
+    console.error(`[find-the-difference] level ${level} art failed`, err);
+    return;
+  }
+
+  const next = assetForLevel(level >= MAX_CAMPAIGN_LEVELS ? 1 : level + 1);
+  prefetch([next.src]);
 }
 
 function handleTap(x, y, game) {
@@ -233,33 +271,16 @@ function layout(stage) {
   sprites = null;
 }
 
-// Only two appearances exist in a round — normal and impostor — so drawing each
-// once into an offscreen canvas turns 48 fruit worth of bezier work per frame
-// into 48 blits. On a mid-range phone that is the difference between 60 and 30.
 function ensureSprites(dpr) {
   if (sprites && sprites.cell === board.cell && sprites.dpr === dpr) return;
-  const px = Math.max(24, Math.ceil(board.cell * CELL_FILL * 1.6));
+  const box = Math.max(24, board.cell * CELL_FILL * SPRITE_HEADROOM);
   sprites = {
     cell: board.cell,
     dpr,
-    px,
-    normal: renderSprite(normal, px, dpr),
-    impostor: renderSprite(impostor, px, dpr),
+    box,
+    normal: makeSprite(art.base, null, box, dpr),
+    impostor: makeSprite(art.variant, impostor.tint, box, dpr),
   };
-}
-
-function renderSprite(state, px, dpr) {
-  const canvas = document.createElement('canvas');
-  const size = Math.ceil(px * dpr);
-  canvas.width = size;
-  canvas.height = size;
-  const c = canvas.getContext('2d');
-  // The set draws in a unit box centred on the origin.
-  c.scale(size, size);
-  c.translate(0.5, 0.5);
-  c.lineJoin = 'round';
-  set.draw(c, state.variantIndex, state.tint);
-  return { canvas, px };
 }
 
 function stepCells(dt) {
@@ -286,7 +307,7 @@ function popValue(cell) {
 }
 
 function drawGrid(c) {
-  const sizeBase = board.cell * CELL_FILL;
+  const fit = board.cell * CELL_FILL;
   for (let i = 0; i < cells.length; i++) {
     const cell = cells[i];
     const state = cell.impostor ? impostor : normal;
@@ -294,21 +315,25 @@ function drawGrid(c) {
     if (pop <= 0) continue;
 
     const wobble = 1 + Math.sin(cell.phase) * 0.03;
-    const size = sizeBase * state.scale * pop * wobble;
-    const pos = cellCenter(board, i);
     const sprite = cell.impostor ? sprites.impostor : sprites.normal;
+    // The sticker keeps its own aspect: the sprite was rasterised to fit the
+    // headroom box, so scaling by fit/box lands it inside the cell.
+    const k = (fit / sprites.box) * state.scale * pop * wobble;
+    const dw = sprite.w * k;
+    const dh = sprite.h * k;
+    const pos = cellCenter(board, i);
 
     let offsetX = 0;
     if (cell.shake) {
-      const k = 1 - cell.shake.t / cell.shake.dur;
-      offsetX = Math.sin(cell.shake.t * 46) * cell.shake.amp * k * board.cell;
+      const s = 1 - cell.shake.t / cell.shake.dur;
+      offsetX = Math.sin(cell.shake.t * 46) * cell.shake.amp * s * board.cell;
     }
 
     c.save();
     c.translate(pos.x + offsetX, pos.y);
     if (state.rotation) c.rotate(state.rotation);
     c.globalAlpha = state.opacity;
-    c.drawImage(sprite.canvas, -size / 2, -size / 2, size, size);
+    c.drawImage(sprite.canvas, -dw / 2, -dh / 2, dw, dh);
     c.restore();
   }
 }
@@ -368,7 +393,7 @@ function stepParticles(dt) {
 }
 
 function drawParticles(c) {
-  c.fillStyle = set.burstColor;
+  c.fillStyle = art.accent;
   for (const p of particles) {
     const k = 1 - p.t / p.dur;
     c.globalAlpha = k;
