@@ -18,8 +18,8 @@ export const ANOMALY_NAMES = ['color', 'shape', 'scale', 'rotation', 'opacity', 
 export function normalState() {
   return {
     tint: [1, 1, 1],
-    variantIndex: -1, // -1 uses the set's base drawing
-    rotation: 0,      // radians
+    edit: null,   // a shape edit applied to the sticker; see SHAPE below
+    rotation: 0,  // radians
     scale: 1,
     opacity: 1,
     wobbleSpeed: 1,
@@ -32,11 +32,7 @@ export function normalState() {
  *
  * @param {number} subtle 0.1 = obvious difference, 0.95 = nearly invisible.
  */
-export function buildImpostorState(anomaly, subtle, variantCount, rng) {
-  // A set without authored variants cannot show a shape difference; fall back
-  // so the round stays solvable.
-  if (anomaly === ANOMALY.SHAPE && variantCount <= 0) anomaly = ANOMALY.COLOR;
-
+export function buildImpostorState(anomaly, subtle, rng) {
   const state = normalState();
   switch (anomaly) {
     case ANOMALY.COLOR: {
@@ -52,9 +48,17 @@ export function buildImpostorState(anomaly, subtle, variantCount, rng) {
       break;
     }
     case ANOMALY.SHAPE:
-      // Variants are authored obvious-first, so harder levels pick later ones.
-      state.variantIndex = Math.max(0, Math.min(variantCount - 1,
-        Math.round(subtle * (variantCount - 1))));
+      // Unity authors a second sprite per fruit; the Figma stickers have none,
+      // so the impostor is the SAME sticker with one detail changed — a bite
+      // out of its outline, or a spot added on it. Both work on any silhouette,
+      // which a hand-authored variant per sticker would not.
+      state.edit = {
+        kind: rng.int(2) === 0 ? 'remove' : 'add',
+        // Where on the sticker, as an angle out from its centre. Fixed once per
+        // round so every impostor in a grid carries the same difference.
+        angle: rng.next() * Math.PI * 2,
+        strength: 1 - subtle,
+      };
       break;
     case ANOMALY.SCALE:
       state.scale = 1 - 0.25 * (1 - subtle);

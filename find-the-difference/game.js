@@ -5,9 +5,9 @@
 
 import { boot } from '../shared/boot.js';
 import { ACCENT, COLOR } from '../shared/tokens.js';
-import { ASSET_COUNT, alternatives, assetForLevel } from './catalog.js';
+import { assetForLevel } from './catalog.js';
 import { campaign, MAX_CAMPAIGN_LEVELS } from './levels.js';
-import { ANOMALY, buildImpostorState, normalState } from './rules.js';
+import { buildImpostorState, normalState } from './rules.js';
 import { cellCenter, fitBoard, hitTest } from './board.js';
 import { CORRECT, WRONG, createRng, createRound } from './round.js';
 import { accentColor, image, makeSprite, prefetch } from './sprites.js';
@@ -148,9 +148,7 @@ function startLevel(n) {
   config = campaign(level);
   asset = assetForLevel(level);
   round = createRound(config.totalCells, config.impostorCount, rng);
-
-  const alts = alternatives(asset);
-  impostor = buildImpostorState(config.anomaly, config.subtle, alts.length, rng);
+  impostor = buildImpostorState(config.anomaly, config.subtle, rng);
 
   cells = [];
   for (let i = 0; i < config.totalCells; i++) {
@@ -178,22 +176,17 @@ function startLevel(n) {
   nextLevelIn = 0;
 
   app?.store.set('level', level);
-  loadArt(alts);
+  loadArt();
 }
 
-async function loadArt(alts) {
+async function loadArt() {
   const token = ++loadToken;
-  // The shape anomaly has no variant art to reach for — it swaps the impostor
-  // for a different sticker in the same theme, ordered so variant 0 is the one
-  // that looks least like the base.
-  const variantSrc = config.anomaly === ANOMALY.SHAPE && impostor.variantIndex >= 0
-    ? alts[Math.min(impostor.variantIndex, alts.length - 1)].src
-    : asset.src;
-
+  // One image per level now: the impostor is this same sticker with an edit
+  // baked into its sprite, never a second file.
   try {
-    const [base, variant] = await Promise.all([image(asset.src), image(variantSrc)]);
+    const base = await image(asset.src);
     if (token !== loadToken) return; // a newer level started while we waited
-    art = { base, variant, accent: accentColor(base, ACC) };
+    art = { base, accent: accentColor(base, ACC) };
     for (let i = 0; i < cells.length; i++) {
       cells[i].pop = { from: 0, to: 1, dur: 0.35, delay: i * 0.012, ease: 'outBack', t: 0 };
     }
@@ -279,7 +272,7 @@ function ensureSprites(dpr) {
     dpr,
     box,
     normal: makeSprite(art.base, null, box, dpr),
-    impostor: makeSprite(art.variant, impostor.tint, box, dpr),
+    impostor: makeSprite(art.base, { tint: impostor.tint, edit: impostor.edit }, box, dpr),
   };
 }
 

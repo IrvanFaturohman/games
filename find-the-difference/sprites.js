@@ -2,8 +2,8 @@
 //
 // Only two appearances exist per round — normal and impostor — so each is
 // rasterised once into an offscreen canvas and the grid becomes blits. That
-// matters more here than it did with drawn shapes: an SVG with a drop-shadow
-// filter is far more expensive to re-rasterise than a dozen bezier paths.
+// matters more here than it did with drawn shapes: an SVG with a filter is far
+// more expensive to re-rasterise than a dozen bezier paths.
 
 import { loadImage } from '../shared/assets.js';
 
@@ -22,10 +22,14 @@ export function prefetch(srcs) {
 }
 
 /**
- * Rasterise `img` to fit a `box` square, preserving its aspect, tinted by a
- * multiply the way SpriteRenderer.color does.
+ * Rasterise `img` to fit a `box` square, preserving its aspect, then apply the
+ * impostor's differences: a multiply tint the way SpriteRenderer.color does,
+ * and a shape edit carved into or painted onto the sticker itself.
  */
-export function makeSprite(img, tint, box, dpr) {
+export function makeSprite(img, options, box, dpr) {
+  // `?? {}` rather than a default parameter: callers pass an explicit null for
+  // the plain sprite, and a default only fills in for `undefined`.
+  const { tint, edit } = options ?? {};
   const natural = Math.max(img.naturalWidth, img.naturalHeight) || 1;
   const scale = box / natural;
   const w = Math.max(1, img.naturalWidth * scale);
@@ -34,7 +38,7 @@ export function makeSprite(img, tint, box, dpr) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(w * dpr));
   canvas.height = Math.max(1, Math.ceil(h * dpr));
-  const c = canvas.getContext('2d');
+  const c = canvas.getContext('2d', { willReadFrequently: true });
   c.scale(canvas.width / w, canvas.height / h);
   c.drawImage(img, 0, 0, w, h);
 
@@ -50,7 +54,108 @@ export function makeSprite(img, tint, box, dpr) {
     c.globalCompositeOperation = 'source-over';
   }
 
+  // After the tint, never before: the tint's `destination-in` pass would put
+  // back exactly the alpha a `remove` edit had just carved away.
+  if (edit) applyEdit(c, canvas, w, edit);
+
   return { canvas, w, h };
+}
+
+/**
+ * One detail changed on the sticker. `remove` bites a notch out of its outline;
+ * `add` puts a spot on its body. Both are placed by walking out from the centre
+ * along `edit.angle` to the sticker's own edge, so they land on the shape rather
+ * than in the empty corners of its box.
+ */
+function applyEdit(c, canvas, w, edit) {
+  const { kind, angle, strength } = edit;
+  let pixels;
+  try {
+    // getImageData ignores the context transform and reads device pixels, which
+    // is why every measurement below is converted back with `toCss`.
+    pixels = c.getImageData(0, 0, canvas.width, canvas.height);
+  } catch {
+    return; // tainted canvas; only possible if the SVG ever came cross-origin
+  }
+
+  const { data, width, height } = pixels;
+  const box = alphaBounds(data, width, height);
+  if (!box) return;
+
+  const cx = (box.minX + box.maxX) / 2;
+  const cy = (box.minY + box.maxY) / 2;
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const reach = Math.hypot(width, height);
+
+  // A sticker is one solid blob, so the last opaque pixel along the ray is its
+  // outline. Scanning beats hardcoding a radius: the shapes are not circles.
+  let edge = 0;
+  for (let r = 1; r < reach; r++) {
+    const x = Math.round(cx + dx * r);
+    const y = Math.round(cy + dy * r);
+    if (x < 0 || y < 0 || x >= width || y >= height) break;
+    if (data[(y * width + x) * 4 + 3] > 128) edge = r;
+  }
+  if (edge <= 2) return;
+
+  // Size by the whole sticker, not by how far the outline happens to be along
+  // this one ray. Scaling by the ray made a bite on a spring onion — long and
+  // thin, so a sideways ray is short — too small to see at any strength. The
+  // geometric mean of the bounds is what keeps a stalk and a cookie comparable.
+  const unit = Math.sqrt((box.maxX - box.minX) * (box.maxY - box.minY)) / 2;
+  const toCss = w / width;
+
+  if (kind === 'remove') {
+    // Centred ON the outline, so half the disc falls outside and it reads as a
+    // bite rather than a hole punched through the middle.
+    c.globalCompositeOperation = 'destination-out';
+    disc(c, (cx + dx * edge) * toCss, (cy + dy * edge) * toCss,
+      unit * (0.18 + 0.38 * strength) * toCss);
+  } else {
+    // `source-atop` clips to the sticker's own alpha, so a spot near the edge
+    // never spills off the shape.
+    c.globalCompositeOperation = 'source-atop';
+    c.fillStyle = meanLuma(data) > 0.55 ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.62)';
+    disc(c, (cx + dx * edge * 0.45) * toCss, (cy + dy * edge * 0.45) * toCss,
+      unit * (0.14 + 0.26 * strength) * toCss);
+  }
+  c.globalCompositeOperation = 'source-over';
+}
+
+/** Bounds of the opaque pixels — the sticker sits inside a box padded by its
+ *  own export, so the canvas centre is not the shape's centre. */
+function alphaBounds(data, width, height) {
+  let minX = width, minY = height, maxX = -1, maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] <= 128) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
+}
+
+function disc(c, x, y, r) {
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fill();
+}
+
+/** Average lightness of the opaque pixels — decides whether a spot reads as
+ *  a dark mark or a light one. */
+function meanLuma(data) {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 200) continue;
+    sum += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+    n++;
+  }
+  return n ? sum / n : 1;
 }
 
 /**
@@ -68,14 +173,13 @@ export function accentColor(img, fallback = '#FFFFFF') {
   try {
     data = c.getImageData(0, 0, size, size).data;
   } catch {
-    return fallback; // tainted canvas; only possible if the SVG ever came cross-origin
+    return fallback;
   }
 
   let best = null;
   let bestScore = -1;
   for (let i = 0; i < data.length; i += 4) {
-    const a = data[i + 3];
-    if (a < 200) continue;
+    if (data[i + 3] < 200) continue;
     const r = data[i], g = data[i + 1], b = data[i + 2];
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     if (max === 0) continue;

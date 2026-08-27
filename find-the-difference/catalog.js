@@ -5,11 +5,9 @@
 // are drawn — the rest are `locked` placeholders with no art — so levels 1-62
 // each get their own object and level 63 wraps back to the first.
 //
-// **Items inside a theme are ordered by how alike they look**, not
-// alphabetically or as the sheet has them. That ordering is the whole shape
-// anomaly: the impostor is a different sticker from the same theme, and how far
-// down the list it sits is how hard it is to spot. Reordering this list retunes
-// the difficulty of every shape level in that theme.
+// A theme is only a run of levels and a set of backgrounds — an impostor is
+// never a different sticker, it is the level's own sticker with one detail
+// edited (see rules.js), so nothing here affects difficulty.
 
 const BG = {
   purple: '#7C5CFF',
@@ -65,8 +63,6 @@ export const THEMES = [
     items: ['bluewhale', 'dolphin', 'orca'],
   },
   {
-    // Two items means one alternative, so a shape level here is always the same
-    // swap. buildImpostorState falls back to colour when a theme has none at all.
     name: 'space',
     backgrounds: [BG.grape, BG.navy, BG.blue],
     items: ['sun', 'moon'],
@@ -97,12 +93,3 @@ export function assetForLevel(level) {
   };
 }
 
-/** Every other sticker in the theme, farthest-looking first — the order
- *  ImpostorRules expects, where variant 0 is the most obvious difference. */
-export function alternatives(entry) {
-  return entry.theme.items
-    .map((slug, index) => ({ slug, distance: Math.abs(index - entry.index) }))
-    .filter((a) => a.distance > 0)
-    .sort((a, b) => b.distance - a.distance || a.slug.localeCompare(b.slug))
-    .map((a) => ({ slug: a.slug, src: src(entry.theme, a.slug) }));
-}

@@ -57,6 +57,9 @@ the cells are narrower than a thumb.
 from Figma (file `F7Vlc4oODiLdMrZEl81oqi`) into `assets/<theme>-<slug>.svg`.
 `catalog.js` maps level to sticker and to a background colour.
 
+Themes are only runs of levels and sets of backgrounds; an impostor is never a
+different sticker, so nothing about the theme lists affects difficulty.
+
 **There are 62, not 100.** The Figma file has twelve sheets of twenty slots, but
 only 62 are drawn — every other slot is a `locked` placeholder with no art inside
 its frame, and Sports, Kitchen, Tools and Halloween are entirely placeholder. So
@@ -89,23 +92,37 @@ legitimately white:
 
 ## Deviations from Unity, all deliberate
 
-- **The shape anomaly swaps the sticker, it does not swap a variant.** Unity
-  authors two shape variants per fruit; Figma has none, so the impostor becomes a
-  different sticker from the same theme. `THEMES[].items` is ordered by how alike
-  the stickers look, and `alternatives()` returns them farthest-first, which is
-  the obvious-to-subtle order `ImpostorRules` already expects. **Reordering that
-  list retunes every shape level in the theme.** A theme with one item (vehicles)
-  has no alternative at all and falls back to a colour anomaly.
+- **The shape anomaly edits the sticker; it never swaps in another one.** Unity
+  authors two shape variants per fruit and Figma has none, so the impostor is the
+  level's own sticker with one detail changed — `remove` bites a notch out of its
+  outline, `add` puts a spot on its body, picked per round. Both work on any
+  silhouette, which is why there is no per-sticker authoring to keep in sync.
+  `rules.js` only decides kind, angle and strength; `sprites.js` finds where the
+  shape actually is.
+  - **Placement is scanned, not assumed.** The sticker sits inside a box padded
+    by its own export, so `alphaBounds` finds the real shape first, and a ray
+    from that centre out to the last opaque pixel finds the outline. `remove`
+    centres its disc ON that point so half falls outside and it reads as a bite
+    rather than a hole; `add` sits at 45% of the way out under `source-atop`, so
+    a spot never spills off the shape.
+  - **Size comes from the whole sticker, not from that ray.** Scaling by the ray
+    made a bite on a spring onion — long and thin, so a sideways ray is short —
+    invisible at every strength. The geometric mean of the alpha bounds is what
+    keeps a stalk and a cookie comparable.
+  - The spot's colour follows `meanLuma`: dark on a light sticker, light on a
+    dark one. A fixed black dot vanishes on an orca or an eggplant.
 - **Art loads per level, not upfront.** 62 SVGs is 364 KB and `loadAll()` would
-  pull all of it before the first frame. A level fetches its two stickers, then
-  prefetches the next level's; `loadToken` drops a slow level's images if a newer
-  level started while they were in flight.
+  pull all of it before the first frame. A level fetches its one sticker, then
+  prefetches the next level's; `loadToken` drops a slow level's image if a newer
+  level started while it was in flight.
 - **Two sprites are cached per round.** Only `normal` and `impostor` appearances
   exist, so each is rasterised once into an offscreen canvas and the grid is
   blits — worth more here than with drawn shapes, since re-rasterising an SVG per
   frame is far more expensive than a dozen bezier paths. Opacity, scale and
   rotation stay at blit time; never bake them. The colour anomaly *is* baked,
-  through a `multiply` fill re-clipped with `destination-in`.
+  through a `multiply` fill re-clipped with `destination-in` — and the shape edit
+  is applied AFTER it, because that `destination-in` pass would put back exactly
+  the alpha a `remove` had just carved away.
 - **Burst particles sample the sticker** (`accentColor`) rather than reading a
   hand-listed colour: 62 hand-picked colours is 62 chances to forget one.
 - **The level is saved.** Unity always starts at `startLevel`; here the phone
