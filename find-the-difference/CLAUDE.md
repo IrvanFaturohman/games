@@ -177,6 +177,29 @@ a flat 12ms; at 66 cells that is 0.8s before the last object exists. `game.js`
 divides `ENTRANCE_STAGGER` (0.4s) across the grid instead, so a big level opens as
 fast as a small one.
 
+## Visual direction — not built yet
+
+The feel currently in the build is the generic hyper-casual set: a floating
+`+100`, a circular particle burst, screen shake, a dark pill HUD. It works and it
+refers to nothing. The replacement is designed in Figma `L14Uu1J6D2XwsI5yExsWkt`
+("Perangko"): a **sheet of postage stamps**, chosen because the match is
+structural — a sheet is a dense grid of identical images separated by
+perforations, and philately is the hunt for printing errors.
+
+| Now | Perangko |
+|---|---|
+| gap between cells | the perforation, punched not drawn |
+| dark pill HUD | the selvage, the sheet's own margin |
+| `LVL 6` | plate number, printed small |
+| `0/4` pill | colour-check dots, blacked out one per find |
+| particle burst + `+100` | a postmark thunks down off-register, killer bars running onto the neighbour |
+| shake + `Oops!` | a red RETUR hand stamp |
+| `x2!` floating | the date in the postmark advances |
+
+One deliberate break from a real sheet: a 9px gutter between stamps. Tiled edge
+to edge the whole screen goes cream and the level's background colour survives
+only inside the perforations.
+
 ## Not ported yet
 
 `endless()` exists in `levels.js` and nothing calls it — same as in Unity, where
