@@ -15,6 +15,7 @@ export const ACCENT = {
   'stick-hero': '#FF5A5F',
   'unpuzzle':   '#3DDC97',
   'polygram':   '#FFB627',
+  'find-the-difference': '#7C5CFF',
 };
 
 // Flat style contract: no gradients, no shadows, sharp corners.

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#7C5CFF">
+<meta name="mobile-web-app-capable" content="yes">
+<title>FIND THE IMPOSTOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/core.css">
+</head>
+<body>
+<canvas id="stage"></canvas>
+<!-- The HUD is drawn on the canvas, which cannot read env(safe-area-inset-*).
+     This probe carries the value into a place JS can measure. -->
+<div class="safe" id="safe-probe"></div>
+<div id="tap-to-start">TAP UNTUK MULAI</div>
+<script type="module" src="./game.js"></script>
+</body>
+</html>
