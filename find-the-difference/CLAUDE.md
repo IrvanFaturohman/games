@@ -141,9 +141,29 @@ Pop-in `outBack` 0.35s staggered 12ms per cell · correct `1.5 -> 1` `outElastic
 does not breathe in lockstep · camera shake 0.06 cell on a combo, 0.1 on a miss ·
 popup rises 0.8 cell over 0.9s `outCubic`, alpha `1 - t^2` · next level after 1.2s.
 
-Cell size is `min(area/cols, area/rows) * 0.82`; the fruit fills 0.78 of its cell.
-Hit test is a circle of half a cell, so a thumb landing in the gap misses rather
-than punishing the nearest fruit.
+## Density
+
+The grid runs the **full width of the screen** and the objects nearly touch:
+`BOARD_FILL` 1 and `CELL_FILL` 0.96, against Unity's 0.82 and 0.78. Unity's
+numbers put the objects at 64% of the space available, which on a phone reads as
+a small grid floating in a field of colour. Width is the binding dimension on
+every campaign level in portrait, so the grid always reaches both edges.
+
+**Sprites are cropped to the drawing, not to the file.** Each export carries the
+padding its drop-shadow filter needed, and stripping that filter left the padding
+behind — up to 11 user units, measured, and different in every file, so a fixed
+inset would have clipped the ones that had none. `contentBounds` measures it once
+per image and `makeSprite` scales the content, not the box, to fill the cell.
+
+Cell size is `min(area/cols, area/rows)`; hit test is a circle of half a cell, so
+a thumb landing in the gap between two objects misses rather than punishing the
+nearest one.
+
+**What is still not dense is the vertical margin.** A square-cell grid can only
+fill a 420x776 play area when `cols/rows` is about 0.54, which needs 4x7, 5x9 or
+6x11 — every campaign level is squarer than that (3x4 up to 6x7), so 40-140px of
+background is left above and below. Closing that gap means more cells per level
+than `levels.js` asks for, which is a difficulty change, not a layout one.
 
 ## Not ported yet
 

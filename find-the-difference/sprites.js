@@ -30,17 +30,32 @@ export function makeSprite(img, options, box, dpr) {
   // `?? {}` rather than a default parameter: callers pass an explicit null for
   // the plain sprite, and a default only fills in for `undefined`.
   const { tint, edit } = options ?? {};
-  const natural = Math.max(img.naturalWidth, img.naturalHeight) || 1;
-  const scale = box / natural;
-  const w = Math.max(1, img.naturalWidth * scale);
-  const h = Math.max(1, img.naturalHeight * scale);
+
+  // Fit the DRAWING to the box, not the file. Every export carries the padding
+  // its drop-shadow filter needed, and stripping the filter left that padding
+  // behind — up to 11 user units, which on a dense grid is a visible gap around
+  // every object. The margin differs per file, so it is measured, not assumed.
+  const crop = contentBounds(img);
+  const contentW = img.naturalWidth * crop.w;
+  const contentH = img.naturalHeight * crop.h;
+  const scale = box / (Math.max(contentW, contentH) || 1);
+  const w = Math.max(1, contentW * scale);
+  const h = Math.max(1, contentH * scale);
 
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(w * dpr));
   canvas.height = Math.max(1, Math.ceil(h * dpr));
   const c = canvas.getContext('2d', { willReadFrequently: true });
   c.scale(canvas.width / w, canvas.height / h);
-  c.drawImage(img, 0, 0, w, h);
+
+  const paint = () => c.drawImage(
+    img,
+    -img.naturalWidth * crop.x * scale,
+    -img.naturalHeight * crop.y * scale,
+    img.naturalWidth * scale,
+    img.naturalHeight * scale);
+
+  paint();
 
   if (tint && (tint[0] !== 1 || tint[1] !== 1 || tint[2] !== 1)) {
     // `multiply` falls back to source-over wherever the destination is
@@ -50,7 +65,7 @@ export function makeSprite(img, options, box, dpr) {
     c.fillStyle = `rgb(${byte(tint[0])},${byte(tint[1])},${byte(tint[2])})`;
     c.fillRect(0, 0, w, h);
     c.globalCompositeOperation = 'destination-in';
-    c.drawImage(img, 0, 0, w, h);
+    paint();
     c.globalCompositeOperation = 'source-over';
   }
 
@@ -113,13 +128,47 @@ function applyEdit(c, canvas, w, edit) {
   c.globalCompositeOperation = 'source-over';
 }
 
-/** Bounds of the opaque pixels — the sticker sits inside a box padded by its
- *  own export, so the canvas centre is not the shape's centre. */
-function alphaBounds(data, width, height) {
+const FULL_BOUNDS = { x: 0, y: 0, w: 1, h: 1 };
+const cropCache = new WeakMap();
+
+/** Where the drawing actually sits inside its file, as 0..1 fractions. Measured
+ *  once per image and cached: it is a property of the asset, not of the size it
+ *  happens to be drawn at. */
+function contentBounds(img) {
+  const cached = cropCache.get(img);
+  if (cached) return cached;
+
+  const R = 128;
+  const probe = document.createElement('canvas');
+  probe.width = probe.height = R;
+  const c = probe.getContext('2d', { willReadFrequently: true });
+  c.drawImage(img, 0, 0, R, R);
+
+  let out = FULL_BOUNDS;
+  try {
+    // A low threshold here, unlike the edit's: this is looking for the outermost
+    // antialiased pixel of the drawing, not for solid body to bite into.
+    const box = alphaBounds(c.getImageData(0, 0, R, R).data, R, R, 8);
+    if (box) {
+      out = {
+        x: box.minX / R,
+        y: box.minY / R,
+        w: (box.maxX + 1 - box.minX) / R,
+        h: (box.maxY + 1 - box.minY) / R,
+      };
+    }
+  } catch { /* tainted canvas; fall back to the whole file */ }
+
+  cropCache.set(img, out);
+  return out;
+}
+
+/** Bounds of the opaque pixels. */
+function alphaBounds(data, width, height, threshold = 128) {
   let minX = width, minY = height, maxX = -1, maxY = -1;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (data[(y * width + x) * 4 + 3] <= 128) continue;
+      if (data[(y * width + x) * 4 + 3] <= threshold) continue;
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;

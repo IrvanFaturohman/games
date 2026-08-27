@@ -15,11 +15,16 @@ import { accentColor, image, makeSprite, prefetch } from './sprites.js';
 const NAME = 'find-the-difference';
 const ACC = ACCENT[NAME];
 
-const CELL_FILL = 0.78;        // object size as a fraction of its cell
+// Density is the look: the grid runs the full width of the screen and the
+// objects nearly touch. Unity's 0.82 board fill times its 0.78 cell fill left the
+// objects at 64% of the space available, which on a phone reads as a small grid
+// floating in a field of colour rather than a screen packed with things.
+const BOARD_FILL = 1;          // grid size as a fraction of the play area
+const CELL_FILL = 0.96;        // object size as a fraction of its cell
 const NEXT_LEVEL_DELAY = 1.2;
-const HUD_HEIGHT = 86;
-const PAD = 16;
-const PAD_BOTTOM = 28;
+const HUD_HEIGHT = 78;
+const PAD = 16;                // HUD margins only; the board has none
+const BOARD_BOTTOM = 6;
 // Sprites are rasterised bigger than they are ever drawn so the pop-in
 // overshoot and the 1.5x correct-tap kick stay crisp.
 const SPRITE_HEADROOM = 1.6;
@@ -256,11 +261,11 @@ function layout(stage) {
 
   const top = safeTop + HUD_HEIGHT;
   board = fitBoard(config.cols, config.rows, {
-    x: PAD,
+    x: 0,
     y: top,
-    w: stage.w - PAD * 2,
-    h: stage.h - top - PAD_BOTTOM,
-  });
+    w: stage.w,
+    h: stage.h - top - BOARD_BOTTOM,
+  }, BOARD_FILL);
   sprites = null;
 }
 
