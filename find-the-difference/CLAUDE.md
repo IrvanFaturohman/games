@@ -94,23 +94,25 @@ legitimately white:
 
 - **The shape anomaly edits the sticker; it never swaps in another one.** Unity
   authors two shape variants per fruit and Figma has none, so the impostor is the
-  level's own sticker with one detail changed — `remove` bites a notch out of its
-  outline, `add` puts a spot on its body, picked per round. Both work on any
-  silhouette, which is why there is no per-sticker authoring to keep in sync.
-  `rules.js` only decides kind, angle and strength; `sprites.js` finds where the
-  shape actually is.
+  level's own sticker with a bite taken out of its outline. That works on any
+  silhouette, so there is no per-sticker authoring to keep in sync. `rules.js`
+  only decides angle and strength; `sprites.js` finds where the shape actually is.
+  - **A bite is the only edit, and that is a finding, not a shortcut.** Two
+    others were built and rejected on the render: a painted spot read as a
+    smudge rather than a drawing, and a bump grown out of the outline read as a
+    lump on the kiwi, the ice cream and the rabbit — fine only on shapes that
+    were already blobs. Variety comes from where and how big, not from having
+    several kinds. A second edit that looks *designed* needs authored variants
+    in Figma; do not add another procedural one without rendering all 62 first.
   - **Placement is scanned, not assumed.** The sticker sits inside a box padded
     by its own export, so `alphaBounds` finds the real shape first, and a ray
-    from that centre out to the last opaque pixel finds the outline. `remove`
-    centres its disc ON that point so half falls outside and it reads as a bite
-    rather than a hole; `add` sits at 45% of the way out under `source-atop`, so
-    a spot never spills off the shape.
+    from that centre out to the last opaque pixel finds the outline. The disc is
+    centred ON that point so half of it falls outside, which reads as a bite
+    rather than as a hole punched through the middle.
   - **Size comes from the whole sticker, not from that ray.** Scaling by the ray
     made a bite on a spring onion — long and thin, so a sideways ray is short —
     invisible at every strength. The geometric mean of the alpha bounds is what
     keeps a stalk and a cookie comparable.
-  - The spot's colour follows `meanLuma`: dark on a light sticker, light on a
-    dark one. A fixed black dot vanishes on an orca or an eggplant.
 - **Art loads per level, not upfront.** 62 SVGs is 364 KB and `loadAll()` would
   pull all of it before the first frame. A level fetches its one sticker, then
   prefetches the next level's; `loadToken` drops a slow level's image if a newer

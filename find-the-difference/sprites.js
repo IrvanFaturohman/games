@@ -62,13 +62,12 @@ export function makeSprite(img, options, box, dpr) {
 }
 
 /**
- * One detail changed on the sticker. `remove` bites a notch out of its outline;
- * `add` puts a spot on its body. Both are placed by walking out from the centre
- * along `edit.angle` to the sticker's own edge, so they land on the shape rather
- * than in the empty corners of its box.
+ * One detail changed on the sticker: a bite out of its outline, placed by
+ * walking out from the centre along `edit.angle` to the sticker's own edge so it
+ * lands on the shape rather than in the empty corners of its box.
  */
 function applyEdit(c, canvas, w, edit) {
-  const { kind, angle, strength } = edit;
+  const { angle, strength } = edit;
   let pixels;
   try {
     // getImageData ignores the context transform and reads device pixels, which
@@ -106,20 +105,11 @@ function applyEdit(c, canvas, w, edit) {
   const unit = Math.sqrt((box.maxX - box.minX) * (box.maxY - box.minY)) / 2;
   const toCss = w / width;
 
-  if (kind === 'remove') {
-    // Centred ON the outline, so half the disc falls outside and it reads as a
-    // bite rather than a hole punched through the middle.
-    c.globalCompositeOperation = 'destination-out';
-    disc(c, (cx + dx * edge) * toCss, (cy + dy * edge) * toCss,
-      unit * (0.18 + 0.38 * strength) * toCss);
-  } else {
-    // `source-atop` clips to the sticker's own alpha, so a spot near the edge
-    // never spills off the shape.
-    c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = meanLuma(data) > 0.55 ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.62)';
-    disc(c, (cx + dx * edge * 0.45) * toCss, (cy + dy * edge * 0.45) * toCss,
-      unit * (0.14 + 0.26 * strength) * toCss);
-  }
+  // Centred ON the outline, so half the disc falls outside and it reads as a
+  // bite rather than a hole punched through the middle.
+  c.globalCompositeOperation = 'destination-out';
+  disc(c, (cx + dx * edge) * toCss, (cy + dy * edge) * toCss,
+    unit * (0.18 + 0.38 * strength) * toCss);
   c.globalCompositeOperation = 'source-over';
 }
 
@@ -145,18 +135,6 @@ function disc(c, x, y, r) {
   c.fill();
 }
 
-/** Average lightness of the opaque pixels — decides whether a spot reads as
- *  a dark mark or a light one. */
-function meanLuma(data) {
-  let sum = 0;
-  let n = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3] < 200) continue;
-    sum += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
-    n++;
-  }
-  return n ? sum / n : 1;
-}
 
 /**
  * The sticker's punchiest colour, for the burst particles. Sampled rather than

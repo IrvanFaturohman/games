@@ -49,11 +49,16 @@ export function buildImpostorState(anomaly, subtle, rng) {
     }
     case ANOMALY.SHAPE:
       // Unity authors a second sprite per fruit; the Figma stickers have none,
-      // so the impostor is the SAME sticker with one detail changed — a bite
-      // out of its outline, or a spot added on it. Both work on any silhouette,
-      // which a hand-authored variant per sticker would not.
+      // so the impostor is the SAME sticker with a bite taken out of its
+      // outline. That works on any silhouette, which a hand-authored variant
+      // per sticker would not.
+      //
+      // Two other edits were built and thrown away: a painted spot read as a
+      // smudge rather than a drawing, and a bump grown out of the outline read
+      // as a lump on half the stickers. A bite is the only one that looks
+      // deliberate on all 62, so variety comes from where and how big, not from
+      // having several kinds.
       state.edit = {
-        kind: rng.int(2) === 0 ? 'remove' : 'add',
         // Where on the sticker, as an angle out from its centre. Fixed once per
         // round so every impostor in a grid carries the same difference.
         angle: rng.next() * Math.PI * 2,
